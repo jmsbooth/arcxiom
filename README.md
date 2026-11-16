@@ -2,43 +2,73 @@
 
 **Architecture, defined as code.**
 
-Arcxiom is a proposed, vendor-neutral Architecture-as-Code specification and reference toolchain for modeling, exchanging, validating, rendering, and governing architectures across software, hardware, systems-of-systems, services, organizations, actors, missions, and business capabilities.
+Arcxiom is an experimental, vendor-neutral Architecture-as-Code project for modeling, querying, validating and rendering architectures across software, hardware, systems-of-systems, services, organizations, actors, missions and business capabilities.
 
-> Project status: **pre-specification / bootstrap**. No implemented compiler, renderer, or conformance claims exist yet.
+**Current status: v0.1 alpha reference prototype.** The source format and ArchIR are **draft contracts**, not a published or independently conformant standard. This prototype is intentionally narrow and implemented in Python to validate semantics rapidly. A Rust reference core remains the target for production.
 
-## Design direction
+## Run the prototype
 
-- **Human authoring:** `.arch.yaml` using a deliberately constrained YAML 1.2 subset.
-- **Future shorthand:** `.arch` may introduce YAML-compatible or YAML-like syntax, but must compile to the same semantics.
-- **Canonical interchange:** versioned, deterministic JSON-based typed graph (`ArchIR`).
-- **Tools:** CLI and APIs for `validate`, `query`, `diff`, `plan`, and `render`.
-- **Rendering:** first a standards-neutral vector PDF drawing-set engine, then edition-locked optional profiles for ISO 128, ISO 5457, ISO 7200, BS EN ISO 19650, US NCS/UDS, and related standards where authorized.
-- **Agents:** read-only architecture queries, scoped proposals, approval-separated policy enforcement, evidence-backed observed-state comparison.
+Python 3.11+ is required. Install in a virtual environment:
 
-Drawings generated from graph topology alone must be explicitly labeled *schematic / not to scale*. Physical geometry and construction documentation require authenticated measurements, units, design authority, and validation.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+arcxiom validate examples/emergency-response.arch.yaml
+arcxiom query examples/emergency-response.arch.yaml --id service.dispatch-api --depth 3
+arcxiom export examples/emergency-response.arch.yaml --format json --output archir.json
+arcxiom render examples/emergency-response.arch.yaml --format pdf --output architecture.pdf
+pytest -q
+```
+
+`python -m arcxiom` and `arch` are CLI aliases of `arcxiom`. The repository includes a complete cross-domain example. The PDF is vector-based, searchable, and explicitly labeled **SCHEMATIC / NOT TO SCALE**. It is not a CAD deliverable or an ISO, NCS, or BS compliant drawing set.
+
+## Minimal YAML draft
+
+```yaml
+version: "0.1-draft"
+namespace: sample
+entities:
+  - id: service.api
+    type: service
+    name: API service
+  - id: capability.response
+    type: capability
+relationships:
+  - from: service.api
+    relation: supports
+    to: capability.response
+```
+
+The prototype checks type membership, duplicate IDs, references, a small rule grammar, and hard constraints. Security properties in YAML are **assertions**, not verified telemetry. Unsupported syntax, drawing profiles, and imports fail explicitly rather than being silently ignored.
 
 ## Repository organization
 
-- [`spec/`](spec/) - proposed normative semantics and conformance model.
-- [`examples/`](examples/) - illustrative, not yet machine-validated models.
-- [`docs/adr/`](docs/adr/) - architecture decisions.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) - initial contribution expectations.
+- `src/arcxiom/`: Python prototype parser, ArchIR builder, graph query engine, CLI, and standards-neutral PDF schematic renderer.
+- `tests/`: runnable positive, negative, security and deterministic-output tests.
+- `examples/`: executable `.arch.yaml` files.
+- `spec/`: evolving draft contract, separate from any implementation.
+- `docs/adr/`: architectural decisions, including the temporary Python-prototype choice.
+- `docs/standards-registry.md`: planned standards profiles and rights gates.
 
-## First milestone
+## Architecture direction
 
-1. Approve the semantic kernel, representation boundaries, grammar, and version negotiation.
-2. Establish rights/editions register for external standards before implementing standards-specific rules or assets.
-3. Define a minimal v0.1 YAML sample and ArchIR JSON normalization contract.
-4. Establish positive and negative conformance fixtures for a standalone validator.
+- **Authoring:** human-readable `.arch.yaml` using a strict YAML subset; a future `.arch` shorthand must be compatible.
+- **Interchange:** versioned ArchIR graph with deterministic JSON and SHA-256 content digest.
+- **Model:** typed entities, directed relationships, requirements/constraints and future evidence links.
+- **Tooling:** `validate`, `query`, `export`, and generic `render --format pdf` are implemented in limited form.
+- **Deferred:** module imports, LSP, formal type profiles and semantics, verified evidence, baseline approvals, agent MCP, Rust core, physical geometry, multi-sheet technical drafting, ISO/BS/NCS conformance and independent implementation testing.
 
-## License and external standards
+## License and standards rights
 
-The project is intended to be open source. **A source license has not yet been selected. Do not treat this bootstrap as granting reuse rights until a LICENSE file is adopted.** Apache-2.0 is an option for the reference implementation; specification/IP governance must be decided explicitly.
+The source repository contains an Apache-2.0 `LICENSE` inherited from the initial GitHub repository. The open specification's long-term publication and contribution terms are not yet finalized.
 
-Referenced ISO, BSI, NIBS and other standards are third-party works. Do not copy or encode restricted normative material, drawing symbols, tables, or assets without legal rights. This repository does not claim standards conformance or certification.
+Third-party standards such as ISO 128, ISO 5457, ISO 7200, BS EN ISO 19650 and NCS/UDS have distinct rights and applicability constraints. Do not copy their normative text, symbol sets, licensed tables or graphical assets into this repository without documented permission. No conformance or certification claim is made. See `docs/standards-registry.md`.
 
-## Planning
+## Development and planning
 
-Linear project: [Architecture-as-Code (.arch) - Open Standard & Toolchain](https://linear.app/lattix/project/architecture-as-code-arch-open-standard-and-toolchain-91615bff7f0d)
+- [Contribution guide](CONTRIBUTING.md)
+- [Prototype limits and security posture](docs/prototype.md)
+- [Linear roadmap](https://linear.app/lattix/project/architecture-as-code-arch-open-standard-and-toolchain-91615bff7f0d)
 
-The specification and reference implementation should remain independent of proprietary Lattix products. Existing workbenches may adopt Arcxiom as consumers.
+Arcxiom is an independently governed open-source effort. Commercial or proprietary modeling workbenches can consume its interchange format but do not define its authoritative semantics.
