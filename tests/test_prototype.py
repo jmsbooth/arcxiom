@@ -189,6 +189,7 @@ def test_untrusted_wrong_types_fail_cleanly():
         assert not compiled.valid
         assert error in {d.code for d in compiled.diagnostics}
 
+
 def test_declaration_of_unused_yaml_anchor_is_rejected(tmp_path):
     path = tmp_path / "anchored.arch.yaml"
     path.write_text('version: "0.1-draft"\nnamespace: valid\nentities: &anchor []\n')
