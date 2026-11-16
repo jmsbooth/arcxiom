@@ -125,7 +125,10 @@ def test_reject_unlicensed_profiles(capsys, tmp_path):
 
 def test_refuse_symlink_inputs(tmp_path):
     link = tmp_path / "linked.arch.yaml"
-    link.symlink_to(EXAMPLE)
+    try:
+        link.symlink_to(EXAMPLE)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation not available in this environment")
     result = compile_file(link)
     assert not result.valid and result.diagnostics[0].code == "AXY010"
 
