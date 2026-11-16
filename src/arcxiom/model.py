@@ -181,7 +181,7 @@ def compile_document(root: dict) -> Compiled:
         if eid in nodes_by_id:
             emit("AXE003", f"duplicate entity id: {eid}", loc + ".id")
             continue
-        if kind not in TYPES:
+        if not isinstance(kind, str) or kind not in TYPES:
             emit("AXE004", f"unknown entity type: {kind}", loc + ".type")
             continue
         name = item.get("name", eid)
@@ -225,6 +225,9 @@ def compile_document(root: dict) -> Compiled:
             emit("AXC002", "constraint id must be unique and well-formed", loc + ".id")
             continue
         seen_constraints.add(cid)
+        if set(item) - {"id", "description", "select", "must", "missing_evidence", "enforcement"}:
+            emit("AXC009", "unsupported constraint keys", loc)
+            continue
         if (not isinstance(selector, dict) or not selector or not isinstance(must, dict) or not must):
             emit("AXC003", "constraint needs nonempty select and must maps", loc)
             continue
@@ -239,7 +242,8 @@ def compile_document(root: dict) -> Compiled:
             continue
         missing = item.get("missing_evidence", "fail")
         enforcement = item.get("enforcement", "hard")
-        if missing not in {"fail", "warn"} or enforcement not in {"hard", "advisory"}:
+        if (not isinstance(missing, str) or missing not in {"fail", "warn"}
+                or not isinstance(enforcement, str) or enforcement not in {"hard", "advisory"}):
             emit("AXC007", "invalid missing_evidence or enforcement", loc)
             continue
         normalized_constraints.append({"id": cid, "select": selector, "must": must,
@@ -249,7 +253,7 @@ def compile_document(root: dict) -> Compiled:
             continue
         attrs = entity["attributes"]
         for key in ("source", "destination"):
-            if key in attrs and attrs[key] not in nodes_by_id:
+            if key in attrs and (not isinstance(attrs[key], str) or attrs[key] not in nodes_by_id):
                 emit("AXE006", f"unknown {key} reference: {attrs[key]}", eid + "." + key)
         if "carries" in attrs:
             if not isinstance(attrs["carries"], list) or any(
