@@ -15,6 +15,8 @@ import yaml
 DRAFT_VERSION = "0.1-draft"
 MAX_BYTES = 1_048_576
 MAX_ENTITIES = 1_000
+MAX_RELATIONSHIPS = 4_000
+MAX_CONSTRAINTS = 500
 MAX_DEPTH = 20
 IDENT = re.compile(r"^[A-Za-z][A-Za-z0-9._-]{0,127}$")
 NAMESPACE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
@@ -50,6 +52,9 @@ class StrictLoader(yaml.SafeLoader):
     def compose_node(self, parent, index):
         if self.check_event(yaml.AliasEvent):
             raise SourceError("AXY003", "YAML aliases are not supported")
+        event = self.peek_event()
+        if getattr(event, "anchor", None) is not None:
+            raise SourceError("AXY003", "YAML anchors are not supported")
         return super().compose_node(parent, index)
 
     def construct_mapping(self, node, deep=False):
@@ -168,6 +173,12 @@ def compile_document(root: dict) -> Compiled:
         constraints = []
     if len(entities) > MAX_ENTITIES:
         emit("AXS005", f"too many entities (max {MAX_ENTITIES})", "entities")
+    if len(edges) > MAX_RELATIONSHIPS:
+        emit("AXS005", f"too many relationships (max {MAX_RELATIONSHIPS})", "relationships")
+        edges = edges[:MAX_RELATIONSHIPS]
+    if len(constraints) > MAX_CONSTRAINTS:
+        emit("AXS005", f"too many constraints (max {MAX_CONSTRAINTS})", "constraints")
+        constraints = constraints[:MAX_CONSTRAINTS]
     nodes_by_id = {}
     for idx, item in enumerate(entities[:MAX_ENTITIES]):
         loc = f"entities[{idx}]"

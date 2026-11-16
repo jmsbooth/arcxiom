@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import math
 from reportlab.lib.pagesizes import A3, landscape
 from reportlab.pdfgen.canvas import Canvas
 
@@ -60,7 +61,41 @@ def render_pdf(ir: dict, path: str | Path, view: str = "overview") -> Path:
         a, b = positions[edge["from"]], positions[edge["to"]]
         ax, ay = a[0] + width / 2, a[1] + height / 2
         bx, by = b[0] + width / 2, b[1] + height / 2
-        canvas.line(ax, ay, bx, by)
+        dx, dy = bx - ax, by - ay
+        distance = math.hypot(dx, dy)
+        if distance < 1:
+            continue
+        unit_x, unit_y = dx / distance, dy / distance
+        # Trim the directed edge to the actual node-box boundaries.
+        candidates = [((width / 2) + 3) / abs(unit_x) if unit_x else float("inf"),
+                      ((height / 2) + 3) / abs(unit_y) if unit_y else float("inf")]
+        trim = min(candidates)
+        sx, sy = ax + unit_x * trim, ay + unit_y * trim
+        ex, ey = bx - unit_x * trim, by - unit_y * trim
+        canvas.line(sx, sy, ex, ey)
+        # Arrowhead communicates direction independently of label placement.
+        head = 7
+        wing = 3.4
+        path = canvas.beginPath()
+        path.moveTo(ex, ey)
+        path.lineTo(ex - unit_x * head - unit_y * wing,
+                    ey - unit_y * head + unit_x * wing)
+        path.lineTo(ex - unit_x * head + unit_y * wing,
+                    ey - unit_y * head - unit_x * wing)
+        path.close()
+        canvas.setFillColorRGB(0.38, 0.40, 0.42)
+        canvas.drawPath(path, stroke=0, fill=1)
+        label = _text(edge["relation"])
+        canvas.setFont("Helvetica", 6.6)
+        label_width = canvas.stringWidth(label, "Helvetica", 6.6)
+        offset_x, offset_y = -unit_y * 10, unit_x * 10
+        cx = (sx + ex) / 2 + offset_x
+        cy = (sy + ey) / 2 + offset_y
+        canvas.setFillColorRGB(1, 1, 1)
+        canvas.roundRect(cx - label_width / 2 - 3, cy - 3,
+                         label_width + 6, 12, 2, stroke=0, fill=1)
+        canvas.setFillColorRGB(0.21, 0.23, 0.26)
+        canvas.drawCentredString(cx, cy, label)
     canvas.setStrokeColorRGB(0.14, 0.16, 0.18)
     for node in nodes:
         x, y = positions[node["id"]]

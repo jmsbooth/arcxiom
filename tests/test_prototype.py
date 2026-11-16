@@ -114,6 +114,8 @@ def test_generic_pdf_is_vector_readable_and_deterministic(tmp_path):
         text = doc[0].get_text()
         assert "NOT TO SCALE" in text
         assert "dispatch-api" in text
+        assert "supports" in text
+        assert "operates" in text
         assert len(doc[0].get_drawings()) > 5
 
 
@@ -186,3 +188,9 @@ def test_untrusted_wrong_types_fail_cleanly():
         compiled = compile_document(document)
         assert not compiled.valid
         assert error in {d.code for d in compiled.diagnostics}
+
+def test_declaration_of_unused_yaml_anchor_is_rejected(tmp_path):
+    path = tmp_path / "anchored.arch.yaml"
+    path.write_text('version: "0.1-draft"\nnamespace: valid\nentities: &anchor []\n')
+    result = compile_file(path)
+    assert not result.valid and result.diagnostics[0].code == "AXY003"
