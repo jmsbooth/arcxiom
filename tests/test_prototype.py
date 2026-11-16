@@ -143,6 +143,7 @@ def test_invalid_type_rejected():
     raw["entities"][0]["type"] = "nonexistent_type"
     assert any(d.code == "AXE004" for d in compile_document(raw).diagnostics)
 
+
 def test_pdf_output_rejects_non_ascii_label(tmp_path):
     from arcxiom.model import read_source
     from arcxiom.model import SourceError
