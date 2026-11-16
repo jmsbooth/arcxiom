@@ -1,0 +1,35 @@
+# Illustrative proposal only; schema and grammar are not yet normative.
+version: "0.1-draft"
+namespace: emergency-response
+entities:
+  - id: mission.coordinate-response
+    type: mission
+    name: Coordinate emergency response
+  - id: capability.dispatch
+    type: capability
+  - id: role.dispatcher
+    type: role
+  - id: system.response-federation
+    type: system_of_systems
+  - id: hardware.mobile-terminal
+    type: hardware
+  - id: service.dispatch-api
+    type: service
+  - id: data.incident-record
+    type: data_asset
+    classification: restricted
+relationships:
+  - from: system.response-federation
+    relation: realizes
+    to: capability.dispatch
+  - from: capability.dispatch
+    relation: supports
+    to: mission.coordinate-response
+  - from: role.dispatcher
+    relation: operates
+    to: hardware.mobile-terminal
+constraints:
+  - id: security.restricted-transport
+    description: Restricted data in transit requires verified encryption.
+    enforcement: hard
+    missing_evidence: fail
