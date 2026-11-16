@@ -308,7 +308,8 @@ def query_reachable(ir: dict, start: str, direction: str = "outgoing", depth: in
     if direction not in {"incoming", "outgoing", "both"} or depth not in range(0, 11):
         raise SourceError("AXQ002", "direction or depth outside supported range (0..10)")
     seen = {start: 0}
-    reached_edges = set()    queue = deque([start])
+    reached_edges = set()
+    queue = deque([start])
     while queue:
         current = queue.popleft()
         if seen[current] >= depth:
