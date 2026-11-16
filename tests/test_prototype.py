@@ -167,3 +167,19 @@ def test_non_standard_view_fails(tmp_path, capsys):
 def test_query_unknown_node_fails(capsys):
     assert main(["query", str(EXAMPLE), "--id", "nope"]) == 2
     assert "AXQ001" in capsys.readouterr().err
+
+
+def test_untrusted_wrong_types_fail_cleanly():
+    from arcxiom.model import read_source
+    cases = [
+        (lambda d: d["entities"][0].update(type={"unexpected": "type"}), "AXE004"),
+        (lambda d: d["entities"][-1].update(source={"not": "an id"}), "AXE006"),
+        (lambda d: d["constraints"][0].update(enforcement=["hard"]), "AXC007"),
+        (lambda d: d["constraints"][0].update(unknown_guardrail=True), "AXC009"),
+    ]
+    for mutate, error in cases:
+        document = read_source(EXAMPLE)
+        mutate(document)
+        compiled = compile_document(document)
+        assert not compiled.valid
+        assert error in {d.code for d in compiled.diagnostics}
