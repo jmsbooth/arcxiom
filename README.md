@@ -60,6 +60,21 @@ The prototype checks type membership, duplicate IDs, references, a small rule gr
 - **Tooling:** `validate`, `query`, `export`, generic `render --format pdf`, and conservative `diff --check-guardrails` are implemented in limited form.
 - **Deferred:** module imports, LSP, formal type profiles and semantics, verified evidence, baseline approvals, agent MCP, Rust core, physical geometry, multi-sheet technical drafting, ISO/BS/NCS conformance and independent implementation testing.
 
+## Independent Rust ArchIR verifier
+
+A preliminary **Rust 1.85** JSON verifier is included at [`rust/arcxiom-ir/`](rust/arcxiom-ir/). It independently checks normalized ArchIR graph structure and recomputes the Python-exported canonical digest. A separate GitHub Actions matrix qualifies Python/Rust digest parity on Linux, Windows and macOS.
+
+```bash
+arcxiom export examples/emergency-response.arch.yaml --output example-archir.json
+cargo run --manifest-path rust/arcxiom-ir/Cargo.toml -- verify example-archir.json
+```
+
+This is **not** the complete Rust compiler, YAML parser or approved-policy verifier. The Rust digest validator deliberately rejects floating-point values until a cross-language numeric canonicalization profile is specified. See [Rust verifier limits](docs/rust-archir.md).
+
+## Initial alpha distribution
+
+The `v0.1.0a1` release candidate is built as a Python wheel and installed into a fresh virtual environment during CI. A passing test suite alone is insufficient for release. See [alpha publication gates](docs/release-candidate.md); merge, tag and GitHub prerelease publication require explicit maintainer approval. No PyPI or crates.io distribution is planned for this first alpha.
+
 ## License and standards rights
 
 The source repository contains an Apache-2.0 `LICENSE` inherited from the initial GitHub repository. The open specification's long-term publication and contribution terms are not yet finalized.
