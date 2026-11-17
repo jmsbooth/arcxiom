@@ -85,7 +85,8 @@ def test_yaml_12_bool_values(tmp_path):
 
 
 def test_query_trace_to_mission():
-    model = compile_file(EXAMPLE)    result = query_reachable(model.ir, "service.dispatch-api", depth=4)
+    model = compile_file(EXAMPLE)
+    result = query_reachable(model.ir, "service.dispatch-api", depth=4)
     assert "mission.coordinate-response" in {n["id"] for n in result["nodes"]}
 
 
