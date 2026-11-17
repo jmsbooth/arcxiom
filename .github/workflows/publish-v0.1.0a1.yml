@@ -1,0 +1,116 @@
+name: Publish Arcxiom v0.1.0a1 (one time)
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/publish-v0.1.0a1.yml
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-v0.1.0a1.yml
+
+permissions: {}
+
+concurrency:
+  group: arcxiom-v0.1.0a1-release
+  cancel-in-progress: false
+
+jobs:
+  review-wiring:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.13'
+      - name: Check intended release version and notes
+        shell: bash
+        run: |
+          python - <<'PY'
+          import tomllib
+          from pathlib import Path
+          project = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']
+          assert project['version'] == '0.1.0a1', project['version']
+          assert Path('docs/releases/v0.1.0a1.md').is_file()
+          assert Path('rust/arcxiom-ir/Cargo.lock').is_file()
+          PY
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'jmsbooth/arcxiom'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: v0.1.0a1
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.13'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.85.0'
+      - name: Reconfirm version and source at merge commit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import tomllib
+          from pathlib import Path
+          project = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']
+          assert project['version'] == '0.1.0a1'
+          assert Path('docs/releases/v0.1.0a1.md').is_file()
+          PY
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Run Python and Rust acceptance tests
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip build
+          python -m pip install -e '.[dev]'
+          python -m pytest -q
+          cargo test --locked --manifest-path rust/arcxiom-ir/Cargo.toml
+      - name: Build wheel and verify clean installation
+        shell: bash
+        run: |
+          python -m build --wheel
+          python -m venv /tmp/arcxiom-alpha-venv
+          /tmp/arcxiom-alpha-venv/bin/python -m pip install dist/*.whl
+          (cd /tmp && "$GITHUB_WORKSPACE/.venv/bin/true" 2>/dev/null) || true
+          (cd /tmp && /tmp/arcxiom-alpha-venv/bin/arcxiom validate "$GITHUB_WORKSPACE/examples/emergency-response.arch.yaml")
+          (cd /tmp && /tmp/arcxiom-alpha-venv/bin/arcxiom export "$GITHUB_WORKSPACE/examples/emergency-response.arch.yaml" --output /tmp/arcxiom-alpha-archir.json)
+          (cd /tmp && /tmp/arcxiom-alpha-venv/bin/arcxiom render "$GITHUB_WORKSPACE/examples/emergency-response.arch.yaml" --format pdf --output /tmp/arcxiom-alpha-schematic.pdf)
+          test -s /tmp/arcxiom-alpha-archir.json
+          test -s /tmp/arcxiom-alpha-schematic.pdf
+          (cd dist && sha256sum ./*.whl > SHA256SUMS)
+      - name: Confirm tag and release do not already exist
+        shell: bash
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release exists: refuse to modify a published artifact' >&2
+            exit 1
+          fi
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+            echo 'Tag exists: refuse to move a versioned release ref' >&2
+            exit 1
+          fi
+      - name: Publish GitHub prerelease from exact merged commit
+        shell: bash
+        run: |
+          gh release create "$TAG" dist/*.whl dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title 'Arcxiom v0.1.0a1 — experimental alpha' \
+            --notes-file docs/releases/v0.1.0a1.md \
+            --prerelease \
+            --latest=false
+      - name: Verify published release
+        shell: bash
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,tagName,isPrerelease,assets
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease' | grep -qx 'true'
