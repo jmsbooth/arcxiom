@@ -312,4 +312,5 @@ def test_supported_integer_boundaries_are_interoperable(value):
     raw["entities"][0]["capacity"] = value
     compiled = compile_document(raw)
     assert compiled.valid, compiled.diagnostics
-    assert compiled.ir["entities"][0]["attributes"]["capacity"] == value
+    entity = next(item for item in compiled.ir["entities"] if item["id"] == "mission.coordinate-response")
+    assert entity["attributes"]["capacity"] == value
