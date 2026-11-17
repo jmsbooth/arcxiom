@@ -32,7 +32,8 @@ namespace: sample
 entities:
   - id: service.api
     type: service
-    name: API service  - id: capability.response
+    name: API service
+  - id: capability.response
     type: capability
 relationships:
   - from: service.api
