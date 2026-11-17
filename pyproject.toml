@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,7 +9,8 @@ description = "Experimental YAML-first Architecture-as-Code reference prototype"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["PyYAML>=6.0,<7", "reportlab>=4.0,<5"]
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "pymupdf>=1.24,<2", "jsonschema>=4.22,<5"]
