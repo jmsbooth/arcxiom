@@ -108,10 +108,14 @@ class Compiled:
 def _value_is_json(value, depth=0) -> bool:
     if depth > MAX_DEPTH:
         return False
-    if value is None or isinstance(value, (str, bool, int)):
+    if value is None or isinstance(value, (str, bool)):
         return True
+    if isinstance(value, int):
+        # Python integers are arbitrary precision; serde_json uses i64/u64.
+        return -(1 << 63) <= value <= (1 << 64) - 1
     if isinstance(value, float):
-        return math.isfinite(value)
+        # v0.1 has no cross-language float canonicalization contract.
+        return False
     if isinstance(value, list):
         return all(_value_is_json(item, depth + 1) for item in value)
     if isinstance(value, dict):
@@ -141,7 +145,7 @@ def read_source(path: str | Path) -> dict:
     if not isinstance(loaded, dict):
         raise SourceError("AXY006", "document root must be a mapping")
     if not _value_is_json(loaded):
-        raise SourceError("AXY007", "invalid scalar, depth or non-finite numeric value")
+        raise SourceError("AXY007", "invalid scalar, numeric range/float, or nesting depth")
     return loaded
 
 
@@ -153,6 +157,9 @@ def compile_document(root: dict) -> Compiled:
 
     if not isinstance(root, dict):
         return Compiled({}, [Diagnostic("AXS000", "error", "document must be a mapping", "root")])
+    if not _value_is_json(root):
+        return Compiled({}, [Diagnostic("AXS006", "error",
+                                        "unsupported scalar, numeric range/float, or nesting depth", "root")])
     for key in sorted(set(root) - {"version", "namespace", "entities", "relationships", "constraints"}):
         emit("AXS001", f"unsupported top-level field: {key}", key)
     version = root.get("version")
@@ -209,6 +216,10 @@ def compile_document(root: dict) -> Compiled:
         loc = f"relationships[{idx}]"
         if not isinstance(item, dict):
             emit("AXR001", "relationship must be an object", loc)
+            continue
+        extra = set(item) - {"from", "relation", "to"}
+        if extra:
+            emit("AXR006", f"unsupported relationship fields: {', '.join(sorted(extra))}", loc)
             continue
         source, target, relation = item.get("from"), item.get("to"), item.get("relation")
         if not all(isinstance(v, str) for v in (source, target, relation)):

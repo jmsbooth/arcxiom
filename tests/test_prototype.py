@@ -272,3 +272,44 @@ def test_diff_cli_exit_codes(tmp_path, capsys):
 def test_bad_root_input_is_typed():
     model = compile_document([])
     assert not model.valid and model.diagnostics[0].code == "AXS000"
+
+
+def test_unknown_relationship_fields_are_rejected():
+    from arcxiom.model import read_source
+    raw = read_source(EXAMPLE)
+    raw["relationships"][0]["trust_boundry"] = "internal"
+    result = compile_document(raw)
+    assert not result.valid
+    assert any(d.code == "AXR006" and "trust_boundry" in d.message
+               for d in result.diagnostics)
+
+
+@pytest.mark.parametrize("value", [
+    -(1 << 63) - 1,
+    1 << 64,
+    -0.1,
+    1.25,
+])
+def test_unsupported_numbers_fail_before_archir_export(tmp_path, value):
+    from arcxiom.model import read_source
+    import yaml
+    raw = read_source(EXAMPLE)
+    raw["entities"][0]["capacity"] = value
+    direct = compile_document(raw)
+    assert not direct.valid
+    assert any(d.code == "AXS006" for d in direct.diagnostics)
+    source = tmp_path / "invalid-number.arch.yaml"
+    source.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    parsed = compile_file(source)
+    assert not parsed.valid
+    assert parsed.diagnostics[0].code == "AXY007"
+
+
+@pytest.mark.parametrize("value", [-(1 << 63), 0, (1 << 63) - 1, (1 << 64) - 1])
+def test_supported_integer_boundaries_are_interoperable(value):
+    from arcxiom.model import read_source
+    raw = read_source(EXAMPLE)
+    raw["entities"][0]["capacity"] = value
+    compiled = compile_document(raw)
+    assert compiled.valid, compiled.diagnostics
+    assert compiled.ir["entities"][0]["attributes"]["capacity"] == value
