@@ -1,4 +1,4 @@
-# Illustrative proposal only; schema and grammar are not yet normative.
+# An original illustrative model. This is a draft, not an ISO-compliant drawing.
 version: "0.1-draft"
 namespace: emergency-response
 entities:
@@ -7,17 +7,30 @@ entities:
     name: Coordinate emergency response
   - id: capability.dispatch
     type: capability
+    name: Incident dispatch
   - id: role.dispatcher
     type: role
+    name: Human dispatcher
   - id: system.response-federation
     type: system_of_systems
+    name: Regional response federation
   - id: hardware.mobile-terminal
     type: hardware
+    name: Field terminal
   - id: service.dispatch-api
     type: service
+    name: Dispatch API
   - id: data.incident-record
     type: data_asset
+    name: Incident record
     classification: restricted
+  - id: flow.incident-submission
+    type: data_flow
+    name: Mobile incident submission
+    source: hardware.mobile-terminal
+    destination: service.dispatch-api
+    carries: [data.incident-record]
+    transport_encrypted: true
 relationships:
   - from: system.response-federation
     relation: realizes
@@ -25,11 +38,27 @@ relationships:
   - from: capability.dispatch
     relation: supports
     to: mission.coordinate-response
+  - from: service.dispatch-api
+    relation: implements
+    to: system.response-federation
   - from: role.dispatcher
     relation: operates
     to: hardware.mobile-terminal
+  - from: hardware.mobile-terminal
+    relation: flows_to
+    to: flow.incident-submission
+  - from: flow.incident-submission
+    relation: flows_to
+    to: service.dispatch-api
+  - from: flow.incident-submission
+    relation: carries
+    to: data.incident-record
 constraints:
   - id: security.restricted-transport
-    description: Restricted data in transit requires verified encryption.
     enforcement: hard
     missing_evidence: fail
+    select:
+      type: data_flow
+      carries_classification: restricted
+    must:
+      transport_encrypted: true

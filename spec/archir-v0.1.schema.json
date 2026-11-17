@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jmsbooth/arcxiom/blob/main/spec/archir-v0.1.schema.json",
+  "title": "Arcxiom ArchIR 0.1-draft prototype interchange",
+  "description": "Structural shape only. This schema is neither the normative language specification nor semantic graph validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["archir_version", "namespace", "entities", "relationships", "constraints"],
+  "properties": {
+    "archir_version": {"const": "0.1-draft"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "namespace": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+    "entities": {"type": "array", "maxItems": 1000, "items": {"$ref": "#/$defs/entity"}},
+    "relationships": {"type": "array", "maxItems": 4000, "items": {"$ref": "#/$defs/relationship"}},
+    "constraints": {"type": "array", "maxItems": 500, "items": {"$ref": "#/$defs/constraint"}}
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,127}$"},
+    "entity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "name", "attributes"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "type": {"type": "string"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "attributes": {"type": "object"}
+      }
+    },
+    "relationship": {
+      "type": "object", "additionalProperties": false,
+      "required": ["from", "relation", "to"],
+      "properties": {
+        "from": {"$ref": "#/$defs/identifier"},
+        "relation": {"type": "string"},
+        "to": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "constraint": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "select", "must", "missing_evidence", "enforcement"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "select": {"type": "object", "minProperties": 1},
+        "must": {"type": "object", "minProperties": 1},
+        "missing_evidence": {"enum": ["fail", "warn"]},
+        "enforcement": {"enum": ["hard", "advisory"]}
+      }
+    }
+  }
+}
