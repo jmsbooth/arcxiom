@@ -81,7 +81,6 @@ jobs:
           python -m build --wheel
           python -m venv /tmp/arcxiom-alpha-venv
           /tmp/arcxiom-alpha-venv/bin/python -m pip install dist/*.whl
-          (cd /tmp && "$GITHUB_WORKSPACE/.venv/bin/true" 2>/dev/null) || true
           (cd /tmp && /tmp/arcxiom-alpha-venv/bin/arcxiom validate "$GITHUB_WORKSPACE/examples/emergency-response.arch.yaml")
           (cd /tmp && /tmp/arcxiom-alpha-venv/bin/arcxiom export "$GITHUB_WORKSPACE/examples/emergency-response.arch.yaml" --output /tmp/arcxiom-alpha-archir.json)
           (cd /tmp && /tmp/arcxiom-alpha-venv/bin/arcxiom render "$GITHUB_WORKSPACE/examples/emergency-response.arch.yaml" --format pdf --output /tmp/arcxiom-alpha-schematic.pdf)
