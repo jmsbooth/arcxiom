@@ -314,6 +314,7 @@ def compile_document(root: dict) -> Compiled:
     diagnostics.sort(key=lambda d: (d.severity != "error", d.path, d.code, d.message))
     return Compiled(ir, diagnostics)
 
+
 def compile_file(path: str | Path) -> Compiled:
     try:
         return compile_document(read_source(path))
