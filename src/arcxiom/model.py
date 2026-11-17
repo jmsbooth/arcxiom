@@ -151,6 +151,8 @@ def compile_document(root: dict) -> Compiled:
     def emit(code: str, message: str, path: str, severity: str = "error"):
         diagnostics.append(Diagnostic(code, severity, message, path))
 
+    if not isinstance(root, dict):
+        return Compiled({}, [Diagnostic("AXS000", "error", "document must be a mapping", "root")])
     for key in sorted(set(root) - {"version", "namespace", "entities", "relationships", "constraints"}):
         emit("AXS001", f"unsupported top-level field: {key}", key)
     version = root.get("version")
@@ -257,6 +259,9 @@ def compile_document(root: dict) -> Compiled:
                 or not isinstance(enforcement, str) or enforcement not in {"hard", "advisory"}):
             emit("AXC007", "invalid missing_evidence or enforcement", loc)
             continue
+        if not _value_is_json(must):
+            emit("AXC010", "must values must be bounded JSON data", loc + ".must")
+            continue
         normalized_constraints.append({"id": cid, "select": selector, "must": must,
                                        "missing_evidence": missing, "enforcement": enforcement})
     for eid, entity in nodes_by_id.items():
@@ -291,7 +296,8 @@ def compile_document(root: dict) -> Compiled:
                     continue
             selected.append(eid)
         if not selected:
-            emit("AXC008", f"constraint {rule['id']} selected no entities", rule["id"], "warning")
+            severity = "error" if rule["enforcement"] == "hard" and rule["missing_evidence"] == "fail" else "warning"
+            emit("AXC008", f"constraint {rule['id']} selected no entities", rule["id"], severity)
         for eid in selected:
             attrs = nodes_by_id[eid]["attributes"]
             for key, expected in rule["must"].items():
@@ -307,7 +313,6 @@ def compile_document(root: dict) -> Compiled:
           "constraints": sorted(normalized_constraints, key=lambda c: c["id"])}
     diagnostics.sort(key=lambda d: (d.severity != "error", d.path, d.code, d.message))
     return Compiled(ir, diagnostics)
-
 
 def compile_file(path: str | Path) -> Compiled:
     try:

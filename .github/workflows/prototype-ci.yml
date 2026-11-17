@@ -20,6 +20,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install prototype and test dependencies
         run: python -m pip install -e '.[dev]'
+      - name: Compile Python sources
+        run: python -m compileall -q src
       - name: Run positive, negative, and PDF tests
         run: python -m pytest -q
       - name: Smoke CLI and architecture export
@@ -28,3 +30,4 @@ jobs:
           arcxiom query examples/emergency-response.arch.yaml --id service.dispatch-api --depth 3
           arcxiom export examples/emergency-response.arch.yaml --format json --output example-archir.json
           arcxiom render examples/emergency-response.arch.yaml --format pdf --output example-drawing.pdf
+          arcxiom diff examples/emergency-response.arch.yaml examples/emergency-response.arch.yaml --check-guardrails --json

@@ -23,3 +23,11 @@ Output is sorted JSON with `archir_version`, `namespace`, `entities`, `relations
 ## Restrictions
 
 Aliases, merge keys, duplicate map keys, custom tags, implicit YAML 1.1 booleans, deep/unbounded structures, imports, arbitrary plugins and new standards-derived profiles are not supported. Inputs exceeding 1 MiB or 1000 entities are rejected. The `render` command emits a generic not-to-scale PDF for at most 20 ASCII-labeled nodes.
+
+## Architecture delta and provisional baseline checks (non-normative)
+
+`arcxiom diff baseline.arch.yaml candidate.arch.yaml --json` reports semantically added, removed and modified entities, directed relationships, and constraints; presentation order is not significant. Both valid documents must share an ArchIR version and namespace. Exit codes are 0 (identical), 3 (changes) and 2 (invalid or rejected).
+
+`--check-guardrails` conservatively rejects removal/modification of pre-existing *hard* constraints and deletion/reclassification of previously classified data assets. An empty selection for a `hard` constraint with `missing_evidence: fail` is invalid. This is an **offline consistency check, not an authorization decision**. It never verifies that the alleged baseline was approved by an authorized principal; signed policy snapshots, independent witnesses, separation of duties and immutable evidence remain deferred.
+
+The JSON schema in `spec/archir-v0.1.schema.json` constrains only the prototype interchange shape. It does not validate semantic relationships or substitute for compiler diagnostics. The canonical hash covers sorted, compact JSON of the normalized IR **without** the `sha256` metadata field; rules for Unicode and floating-point interoperability remain open for cross-language specification.

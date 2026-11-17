@@ -4,7 +4,7 @@
 
 Arcxiom is an experimental, vendor-neutral Architecture-as-Code project for modeling, querying, validating and rendering architectures across software, hardware, systems-of-systems, services, organizations, actors, missions and business capabilities.
 
-**Current status: v0.1 alpha reference prototype.** The source format and ArchIR are **draft contracts**, not a published or independently conformant standard. This prototype is intentionally narrow and implemented in Python to validate semantics rapidly. A Rust reference core remains the target for production.
+**Current status: v0.1.0a1 alpha reference prototype.** The source format and ArchIR are **draft contracts**, not a published or independently conformant standard. This prototype is intentionally narrow and implemented in Python to validate semantics rapidly. A Rust reference core remains the target for production.
 
 ## Run the prototype
 
@@ -18,6 +18,7 @@ arcxiom validate examples/emergency-response.arch.yaml
 arcxiom query examples/emergency-response.arch.yaml --id service.dispatch-api --depth 3
 arcxiom export examples/emergency-response.arch.yaml --format json --output archir.json
 arcxiom render examples/emergency-response.arch.yaml --format pdf --output architecture.pdf
+arcxiom diff examples/emergency-response.arch.yaml examples/emergency-response.arch.yaml --json
 pytest -q
 ```
 
@@ -31,8 +32,7 @@ namespace: sample
 entities:
   - id: service.api
     type: service
-    name: API service
-  - id: capability.response
+    name: API service  - id: capability.response
     type: capability
 relationships:
   - from: service.api
@@ -56,7 +56,7 @@ The prototype checks type membership, duplicate IDs, references, a small rule gr
 - **Authoring:** human-readable `.arch.yaml` using a strict YAML subset; a future `.arch` shorthand must be compatible.
 - **Interchange:** versioned ArchIR graph with deterministic JSON and SHA-256 content digest.
 - **Model:** typed entities, directed relationships, requirements/constraints and future evidence links.
-- **Tooling:** `validate`, `query`, `export`, and generic `render --format pdf` are implemented in limited form.
+- **Tooling:** `validate`, `query`, `export`, generic `render --format pdf`, and conservative `diff --check-guardrails` are implemented in limited form.
 - **Deferred:** module imports, LSP, formal type profiles and semantics, verified evidence, baseline approvals, agent MCP, Rust core, physical geometry, multi-sheet technical drafting, ISO/BS/NCS conformance and independent implementation testing.
 
 ## License and standards rights
@@ -69,6 +69,8 @@ Third-party standards such as ISO 128, ISO 5457, ISO 7200, BS EN ISO 19650 and N
 
 - [Contribution guide](CONTRIBUTING.md)
 - [Prototype limits and security posture](docs/prototype.md)
+- [Threat model and release gates](docs/security.md)
+- [Alpha release checklist](docs/release.md)
 - [Linear roadmap](https://linear.app/lattix/project/architecture-as-code-arch-open-standard-and-toolchain-91615bff7f0d)
 
 Arcxiom is an independently governed open-source effort. Commercial or proprietary modeling workbenches can consume its interchange format but do not define its authoritative semantics.

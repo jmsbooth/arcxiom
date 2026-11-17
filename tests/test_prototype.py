@@ -85,8 +85,7 @@ def test_yaml_12_bool_values(tmp_path):
 
 
 def test_query_trace_to_mission():
-    model = compile_file(EXAMPLE)
-    result = query_reachable(model.ir, "service.dispatch-api", depth=4)
+    model = compile_file(EXAMPLE)    result = query_reachable(model.ir, "service.dispatch-api", depth=4)
     assert "mission.coordinate-response" in {n["id"] for n in result["nodes"]}
 
 
@@ -195,3 +194,80 @@ def test_declaration_of_unused_yaml_anchor_is_rejected(tmp_path):
     path.write_text('version: "0.1-draft"\nnamespace: valid\nentities: &anchor []\n')
     result = compile_file(path)
     assert not result.valid and result.diagnostics[0].code == "AXY003"
+
+
+def test_diff_is_semantic_and_order_invariant():
+    import copy
+    from arcxiom.model import read_source
+    from arcxiom.diff import compare_ir
+    old = compile_document(read_source(EXAMPLE))
+    candidate = copy.deepcopy(read_source(EXAMPLE))
+    candidate["entities"].reverse()
+    assert not compare_ir(old.ir, compile_document(candidate).ir)["changed"]
+    candidate["entities"][0]["name"] += " modified"
+    change = compare_ir(old.ir, compile_document(candidate).ir)
+    assert change["changed"]
+    assert len(change["changes"]) == 1
+    assert change["changes"][0]["action"] == "modified"
+
+
+def test_diff_rejects_cross_namespace_comparison():
+    from arcxiom.model import read_source
+    from arcxiom.diff import compare_ir
+    approved = compile_document(read_source(EXAMPLE)).ir
+    another = read_source(EXAMPLE)
+    another["namespace"] = "elsewhere"
+    with pytest.raises(ValueError, match="namespaces"):
+        compare_ir(approved, compile_document(another).ir)
+
+
+def test_guardrail_delta_prevents_removal_and_reclassification():
+    from arcxiom.model import read_source
+    from arcxiom.diff import check_guardrail_delta
+    baseline = compile_file(EXAMPLE).ir
+    candidate = read_source(EXAMPLE)
+    candidate["constraints"] = []
+    candidate["entities"][-2]["classification"] = "public"
+    issues = check_guardrail_delta(baseline, compile_document(candidate).ir)
+    assert {v.code for v in issues} == {"AXG001", "AXG004"}
+
+
+def test_guardrail_delta_detects_modified_hard_rule():
+    from arcxiom.model import read_source
+    from arcxiom.diff import check_guardrail_delta
+    baseline = compile_file(EXAMPLE).ir
+    proposed = read_source(EXAMPLE)
+    proposed["constraints"][0]["enforcement"] = "advisory"
+    assert "AXG002" in {v.code for v in check_guardrail_delta(baseline, compile_document(proposed).ir)}
+
+
+def test_constraint_with_empty_selector_fails_closed():
+    from arcxiom.model import read_source
+    raw = read_source(EXAMPLE)
+    raw["entities"][-2]["classification"] = "public"
+    model = compile_document(raw)
+    assert not model.valid
+    assert any(d.code == "AXC008" and d.severity == "error" for d in model.diagnostics)
+
+
+def test_diff_cli_exit_codes(tmp_path, capsys):
+    from arcxiom.model import read_source
+    import yaml
+    assert main(["diff", str(EXAMPLE), str(EXAMPLE), "--json"]) == 0
+    assert not json.loads(capsys.readouterr().out)["changed"]
+    candidate = read_source(EXAMPLE)
+    candidate["entities"][0]["name"] += " revised"
+    path = tmp_path / "candidate.arch.yaml"
+    path.write_text(yaml.safe_dump(candidate, sort_keys=False))
+    assert main(["diff", str(EXAMPLE), str(path), "--json"]) == 3
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["changes"][0]["action"] == "modified"
+    candidate["constraints"] = []
+    path.write_text(yaml.safe_dump(candidate, sort_keys=False))
+    assert main(["diff", str(EXAMPLE), str(path), "--check-guardrails"]) == 2
+    assert "AXG001" in capsys.readouterr().err
+
+
+def test_bad_root_input_is_typed():
+    model = compile_document([])
+    assert not model.valid and model.diagnostics[0].code == "AXS000"

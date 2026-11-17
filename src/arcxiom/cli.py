@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import sys
 
+from .diff import compare_ir, check_guardrail_delta
 from .drawing import render_pdf
 from .model import SourceError, compile_file, query_reachable
 
@@ -48,11 +49,39 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--drawing-profile", default="generic")
     render.add_argument("--info-profile", default="none")
     render.add_argument("--output", "-o")
+    diff = sub.add_parser("diff", help="Compare two architecture documents")
+    diff.add_argument("baseline", help="Original .arch.yaml")
+    diff.add_argument("candidate", help="Proposed .arch.yaml")
+    diff.add_argument("--json", action="store_true")
+    diff.add_argument("--check-guardrails", action="store_true", help="Reject changes to approved hard constraints and data classifications (baseline authenticity NOT verified)")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "diff":
+        baseline, candidate = compile_file(args.baseline), compile_file(args.candidate)
+        if not baseline.valid or not candidate.valid:
+            _print_diagnostics(baseline, False)
+            _print_diagnostics(candidate, False)
+            return 2
+        try:
+            delta = compare_ir(baseline.ir, candidate.ir)
+            guardrails = check_guardrail_delta(baseline.ir, candidate.ir) if args.check_guardrails else []
+        except ValueError as exc:
+            print(f"ERROR AXD001: {exc}", file=sys.stderr)
+            return 2
+        delta["guardrail_violations"] = [v.as_json() for v in guardrails]
+        if args.json:
+            print(json.dumps(delta, sort_keys=True, indent=2))
+        else:
+            for change in delta["changes"]:
+                print(f"{change['section']}  {change['action']:<9} {change['id']}")
+            for violation in guardrails:
+                print(f"ERROR {violation.code}: {violation.object_id}: {violation.message}", file=sys.stderr)
+            if not delta["changed"]:
+                print("no semantic changes")
+        return 2 if guardrails else (3 if delta["changed"] else 0)
     model = compile_file(args.input)
     if args.command == "validate":
         _print_diagnostics(model, args.json)
