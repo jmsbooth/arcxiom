@@ -1,6 +1,6 @@
 # Rust Architecture Kernel threat model and security review checklist
 
-Status: security review draft for FOSS-587/FOSS-588/FOSS-590; not an independent approval.
+Status: security review draft for FOSS-587/FOSS-588/FOSS-590; not an independent approval. This release uses the temporary solo-maintainer exception detailed in docs/release-governance-v0.2.0a1.md. A sole maintainer must explicitly accept the residual risks; tests do not provide independent assurance.
 
 ## Trust boundary
 
@@ -22,13 +22,13 @@ The .arch.yaml file, its file path, ArchIR JSON supplied to verify, command-line
 | Dependency compromise / malicious CI | Rust lockfile, maintained safe-Rust serde-saphyr YAML parser, pinned core CI actions, least-privilege CI, no release on PR pushes, maintainer-only explicit release draft | Full dependency vulnerability, license and transitive audit must be signed off before publication |
 | Artifact substitution | Candidate archive and per-file checksums; independent checksum verification in release packaging | Checksum file and artifact must be distributed/authenticated through trusted channel; attested provenance is not yet delivered |
 
-## Required independent checks
+## Required security checks (owner-led for this alpha)
 
 1. Review entire Rust parser, canonicalization and graph semantics with the published Python reference and negative fixtures.
 2. Run compiler fuzz/property inputs and cross-platform memory/CPU limits; inspect failures, not just elapsed time.
 3. Inspect dependency inventory and vulnerabilities (RustSec advisory database) and validate Apache-2.0 compatibility.
 4. Verify published emergency-response digest, additional multi-domain fixture, and no-output-on-error invariants.
-5. Confirm that the default branch requires review and successful checks; restrict bypass; configure an arcxiom-release environment with required reviewers.
+5. Confirm that the default branch requires PRs and all CI checks with admin enforcement (zero external approvals under the solo-maintainer exception); configure arcxiom-release to require a separate owner approval action, with self-review allowed.
 6. Sign off the final SHA and archive SHA256SUMS prior to manually publishing the draft prerelease.
 
-No security assurance or release approval should be inferred from this document alone.
+No independent security assurance or release approval should be inferred from this document alone. The owner-only profile provides materially weaker resistance to a compromised maintainer account than independent review and must be revisited when a trusted second maintainer exists.
