@@ -47,6 +47,8 @@ def test_release_publication_cannot_bypass_build_and_environment():
     assert set(matrix["os"]) == {"ubuntu-latest", "macos-latest", "windows-latest"}
     release_commands = "\n".join(step.get("run", "") for step in jobs["create-draft"]["steps"])
     assert "sha256sum -c SHA256SUMS" in release_commands
+    build_commands = "\n".join(step.get("run", "") for step in jobs["build"]["steps"])
+    assert "python scripts/package_release.py --output dist" in build_commands
     assert "gh release create" in release_commands
     assert "--draft" in release_commands and "--prerelease" in release_commands
     assert "--target \"$GITHUB_SHA\"" in release_commands
@@ -89,6 +91,9 @@ def test_release_validation_uses_pinned_dependencies_and_no_pr_write_token():
     assert "--locked" in "\n".join(
         s.get("run", "") for s in _workflow(KERNEL)["jobs"]["rust-kernel"]["steps"]
     )
+    kernel_steps = _workflow(KERNEL)["jobs"]["rust-kernel"]["steps"]
+    assert any("python scripts/package_release.py --output dist" in step.get("run", "")
+               for step in kernel_steps)
     rust = _workflow(KERNEL)
     assert rust["permissions"] == {"contents": "read"}
     assert "pull_request" in rust["on"]
