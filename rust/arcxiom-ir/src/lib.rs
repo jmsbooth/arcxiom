@@ -336,13 +336,18 @@ fn preflight(src: &str) -> Result<(), Diagnostic> {
             }
             previous = c;
         }
-        // YAML block scalars are deliberately excluded in this compatibility subset.
+        // All block scalar indicator variants (including chomping / indentation)
+        // are outside the draft grammar, even when serde-saphyr supports them.
         let line = raw.split(" #").next().unwrap_or(raw).trim_end();
-        if line.ends_with(": |")
-            || line.ends_with(": >")
-            || line.ends_with(": |-")
-            || line.ends_with(": >-")
-        {
+        let indicator = line.rsplit_once(':').map(|(_, scalar)| scalar.trim());
+        let is_block_scalar = indicator.is_some_and(|scalar| {
+            let bytes = scalar.as_bytes();
+            matches!(bytes.first(), Some(b'|' | b'>'))
+                && bytes[1..]
+                    .iter()
+                    .all(|c| matches!(c, b'+' | b'-' | b'0'..=b'9'))
+        });
+        if is_block_scalar {
             return Err(Diagnostic::error(
                 "AXY001",
                 "block scalars are not supported",
@@ -484,6 +489,9 @@ pub fn compile_document(root: &Value) -> Compiled {
             "invalid namespace",
             "namespace",
         ));
+    }
+    if !obj.contains_key("entities") {
+        ds.push(Diagnostic::error("AXS004", "entities field is required", "entities"));
     }
     let entities = opt_array(obj, "entities", &mut ds, MAX_ENTITIES);
     let relations = opt_array(obj, "relationships", &mut ds, MAX_RELATIONSHIPS);
