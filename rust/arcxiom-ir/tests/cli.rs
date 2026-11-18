@@ -144,7 +144,8 @@ fn verifier_caps_oversized_ir_files_before_deserialization() {
     let dir = test_dir("oversized-json");
     let path = dir.join("oversized.json");
     let file = fs::File::create(&path).unwrap();
-    file.set_len((4 * arcxiom_ir::MAX_BYTES + 2) as u64).unwrap();
+    file.set_len((4 * arcxiom_ir::MAX_BYTES + 2) as u64)
+        .unwrap();
     let result = command(&["verify", path.to_str().unwrap()]);
     assert_eq!(result.status.code(), Some(2), "{result:?}");
     assert!(String::from_utf8_lossy(&result.stderr).contains("AXIR07"));
