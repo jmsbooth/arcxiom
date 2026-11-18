@@ -63,7 +63,7 @@ The prototype checks type membership, duplicate IDs, references, a small rule gr
 
 ## Rust-native kernel (v0.2.0a1 candidate)
 
-The Rust 1.85 crate at [rust/arcxiom-ir/](rust/arcxiom-ir/) builds a portable `arcxiom` executable with native YAML compilation, typed graph validation, deterministic canonical ArchIR, digest verification, query traversal and semantic diff. This is the target implementation for the next alpha, **not yet a published release**.
+The Rust 1.89 crate at [rust/arcxiom-ir/](rust/arcxiom-ir/) builds a portable `arcxiom` executable with native YAML compilation, typed graph validation, deterministic canonical ArchIR, digest verification, query traversal and semantic diff. This is the target implementation for the next alpha, **not yet a published release**.
 
 ```bash
 cargo build --locked --release --manifest-path rust/arcxiom-ir/Cargo.toml
