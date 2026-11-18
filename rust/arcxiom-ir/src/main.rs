@@ -140,7 +140,9 @@ fn main_run(args: &[String]) -> Result<i32, (i32, String)> {
             if let Some(path) = opts.output {
                 let target = Path::new(&path);
                 if target.is_symlink()
-                    || target.parent().is_some_and(|p| !p.as_os_str().is_empty() && !p.is_dir())
+                    || target
+                        .parent()
+                        .is_some_and(|p| !p.as_os_str().is_empty() && !p.is_dir())
                 {
                     return Err((2, "AXO001: symlink or missing output directory".into()));
                 }
