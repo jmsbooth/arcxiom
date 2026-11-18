@@ -1,0 +1,8 @@
+version: "0.1-draft"
+namespace: scalar-boundaries
+entities:
+  - id: service.dispatch
+    type: service
+    name: "Dispatch 🛰"
+    labels: {"naïve": 'on', "del\u007F": "end\u007F", literal: '\u007f'}
+    readings: [-9223372036854775808, 18446744073709551615, true, false, null]

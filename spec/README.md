@@ -1,6 +1,6 @@
 # Proposed Arcxiom specification
 
-This directory is reserved for the independently maintained normative specification.
+The [single-file source and canonicalization profile](archyaml-v0.1-compat.md) and [ArchIR structural schema](archir-v0.1.schema.json) describe the implemented experimental edition. The [shared corpus](../tests/conformance/0.1-draft/cases.json) exercises the supported intersection of the Rust and Python implementations.
 
 Candidate specification topics:
 

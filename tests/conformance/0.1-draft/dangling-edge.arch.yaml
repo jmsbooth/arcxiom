@@ -1,0 +1,5 @@
+version: 0.1-draft
+namespace: example
+entities: [{id: service.dispatch, type: service}]
+relationships:
+  - {from: service.dispatch, relation: supports, to: mission.missing}

@@ -446,3 +446,23 @@ fn source_loader_rejects_nonregular_directory_and_fifo() {
     let _ = std::fs::remove_file(&fifo);
     assert_eq!(model.diagnostics[0].code, "AXY012");
 }
+
+#[test]
+fn del_escape_uses_the_published_digest_and_rejects_the_old_rust_claim() {
+    let ir = valid(include_str!(
+        "../../../tests/conformance/0.1-draft/scalars.arch.yaml"
+    ));
+    let mut document: Value = serde_json::from_str(&export(&ir).unwrap()).unwrap();
+    let published_profile = "93a73fc2f778ad97fd5ff4ba5158e66bba3017afc9ac4b86f8d7adee7c08afc7";
+    assert_eq!(document["sha256"], published_profile);
+    assert_eq!(
+        verify_json(&serde_json::to_vec(&document).unwrap()).unwrap(),
+        published_profile
+    );
+
+    // Recorded from the a1 executable at 48c6085, with identical graph content.
+    document["sha256"] = json!("eadc3db47e17cdb3792e783e4f01d0ff0e3c70f4663482ae86b9e9b2d20a2087");
+    assert!(verify_json(&serde_json::to_vec(&document).unwrap())
+        .unwrap_err()
+        .starts_with("AXIR19"));
+}

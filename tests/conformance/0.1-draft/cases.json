@@ -1,0 +1,16 @@
+{
+  "edition": "0.1-draft",
+  "schema": "spec/archir-v0.1.schema.json",
+  "accepted": {
+    "examples/emergency-response.arch.yaml": "9349e821e97cc8999dc170b9e0f4815bad22dbd1d3a38db46f565a3159b52d9f",
+    "examples/zero-trust-federation.arch.yaml": "40d8ebd5443c7c24b5a20ada67c3ebed6f1a6261b7460f691051d1aaae82f827",
+    "tests/conformance/0.1-draft/scalars.arch.yaml": "93a73fc2f778ad97fd5ff4ba5158e66bba3017afc9ac4b86f8d7adee7c08afc7",
+    "tests/conformance/0.1-draft/scalars-reordered.arch.yaml": "93a73fc2f778ad97fd5ff4ba5158e66bba3017afc9ac4b86f8d7adee7c08afc7"
+  },
+  "rejected": {
+    "tests/conformance/0.1-draft/duplicate-key.arch.yaml": {"code": "AXY002"},
+    "tests/conformance/0.1-draft/fraction.arch.yaml": {"code": "AXY007"},
+    "tests/conformance/0.1-draft/dangling-edge.arch.yaml": {"code": "AXR004", "path": "relationships[0]"},
+    "tests/conformance/0.1-draft/unsupported-version.arch.yaml": {"code": "AXS002", "path": "version"}
+  }
+}

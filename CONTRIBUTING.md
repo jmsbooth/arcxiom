@@ -1,6 +1,6 @@
 # Contributing to Arcxiom
 
-Arcxiom remains experimental: v0.1.0a1 is published and the v0.2.0a1 Rust-native kernel is a draft release candidate. Open an issue or RFC before introducing new domain entities, language grammar, interchange shapes, or standards-derived drawing rules.
+Arcxiom remains experimental: v0.1.0a1 is published, the v0.2.0a1 Rust kernel is merged, and a2 qualification is underway. See the [qualification scope and replay command](docs/releases/v0.2.0a2.md). Open an issue or RFC before introducing new domain entities, language grammar, interchange shapes, or standards-derived drawing rules.
 
 1. Fork and branch from `main`, make a scoped change, and submit a pull request.
 2. Run `python -m pytest -q`, `cargo test --locked --manifest-path rust/arcxiom-ir/Cargo.toml --all-targets`, and the Rust/Python CLI smoke and parity checks. CI is authoritative for Windows/macOS/Linux qualification.

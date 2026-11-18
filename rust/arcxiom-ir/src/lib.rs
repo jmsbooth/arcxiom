@@ -985,7 +985,8 @@ pub fn canonical_json(v: &Value) -> Result<String, String> {
         Value::String(s) => {
             let mut out = String::new();
             for c in serde_json::to_string(s).map_err(|e| e.to_string())?.chars() {
-                if c.is_ascii() {
+                // Python ensure_ascii escapes DEL as well as non-ASCII scalars.
+                if c < '\u{7f}' {
                     out.push(c);
                 } else {
                     let mut utf16 = [0u16; 2];

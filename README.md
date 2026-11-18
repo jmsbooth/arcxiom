@@ -4,7 +4,9 @@
 
 Arcxiom is an experimental, vendor-neutral Architecture-as-Code project for modeling, querying, validating and rendering architectures across software, hardware, systems-of-systems, services, organizations, actors, missions and business capabilities.
 
-**Published baseline: v0.1.0a1. Next release candidate: v0.2.0a1 (Rust-Native Architecture Kernel, in draft PR).** The .arch.yaml language and ArchIR remain **experimental 0.1-draft contracts**, not a completed standard or certified security control. Rust is becoming the authoritative source compiler; the shipped Python package remains the reference/compatibility implementation and the generic PDF adapter. The release candidate is not yet approved or published.
+**Published baseline: v0.1.0a1.** The v0.2.0a1 Rust-native kernel merged in [PR #2](https://github.com/jmsbooth/arcxiom/pull/2). Public release requires separate maintainer approval. Rust is the authoritative source compiler. Python provides the compatibility implementation and generic PDF adapter. The single-file language and ArchIR use the experimental `0.1-draft` contract.
+
+The [v0.2.0a2 qualification scope](docs/releases/v0.2.0a2.md) records the shared conformance corpus, producer migration and outstanding release gates. The next feature proposal is [modular authoring and mission-impact analysis](docs/releases/v0.3.0a1-scope.md).
 
 ## Run the published Python v0.1.0a1 reference
 
@@ -61,9 +63,9 @@ The prototype checks type membership, duplicate IDs, references, a small rule gr
 - **Tooling:** `validate`, `query`, `export`, generic `render --format pdf`, and conservative `diff --check-guardrails` are implemented in limited form.
 - **Deferred:** module imports, LSP, formal type profiles and semantics, verified evidence, baseline approvals, agent MCP, physical geometry, multi-sheet technical drafting, ISO/BS/NCS conformance and independent implementation testing.
 
-## Rust-native kernel (v0.2.0a1 candidate)
+## Rust-native kernel
 
-The Rust 1.89 crate at [rust/arcxiom-ir/](rust/arcxiom-ir/) builds a portable `arcxiom` executable with native YAML compilation, typed graph validation, deterministic canonical ArchIR, digest verification, query traversal and semantic diff. This is the target implementation for the next alpha, **not yet a published release**.
+The Rust 1.89 crate at [rust/arcxiom-ir/](rust/arcxiom-ir/) builds a portable `arcxiom` executable with native YAML compilation, typed graph validation, deterministic canonical ArchIR, digest verification, query traversal and semantic diff. The Rust CLI runs independently of the Python package.
 
 ```bash
 cargo build --locked --release --manifest-path rust/arcxiom-ir/Cargo.toml

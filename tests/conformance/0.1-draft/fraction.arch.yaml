@@ -1,0 +1,4 @@
+version: 0.1-draft
+namespace: example
+entities:
+  - {id: service.dispatch, type: service, weight: 1.25}

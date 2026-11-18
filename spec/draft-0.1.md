@@ -8,7 +8,7 @@ File suffix `.arch.yaml`, root mapping with `version`, `namespace`, `entities`, 
 
 ## Entities and edges
 
-Each entity has a unique `id`, a registered `type` and an optional display `name`. Additional JSON-compatible source fields become ArchIR `attributes`. A relationship has `from`, `relation`, `to` and must reference existing IDs. Prototype relation type checking is vocabulary-only: strict domain/range semantics are deferred.
+Each entity has a unique `id`, a registered `type` and an optional display `name`. Additional JSON-compatible source fields become ArchIR `attributes`. A relationship has `from`, `relation`, `to` and must reference existing IDs. The Python prototype checks relation vocabulary. The Rust kernel also checks selected domains and ranges defined in the [compatibility profile](archyaml-v0.1-compat.md).
 
 The current type vocabulary is defined in `src/arcxiom/model.py`. This is a versioned experimental registry, not an extensible external ontology yet.
 
@@ -18,7 +18,7 @@ Prototype constraints require unique `id`, `select` with `type` and optional `ca
 
 ## ArchIR
 
-Output is sorted JSON with `archir_version`, `namespace`, `entities`, `relationships`, `constraints`. The optional `sha256` field from the `export` command is SHA-256 of the compact JSON map without the digest field; its lowercase, 64-hex-character form is permitted by the ArchIR JSON Schema. Canonical JSON field ordering and Unicode escaping are currently implementation-defined prototype contracts; a cross-language canonicalization specification and test corpus are still required.
+Output is sorted JSON with `archir_version`, `namespace`, `entities`, `relationships`, `constraints`. The optional `sha256` field from the `export` command is SHA-256 of the compact JSON map without the digest field; its lowercase, 64-hex-character form is permitted by the ArchIR JSON Schema. The [compatibility profile](archyaml-v0.1-compat.md) specifies recursive key ordering, Unicode escaping, numeric bounds and the SHA-256 input. The [shared corpus](../tests/conformance/0.1-draft/cases.json) freezes representative outputs.
 
 ## Restrictions
 
@@ -30,4 +30,6 @@ Aliases, merge keys, duplicate map keys, custom tags, implicit YAML 1.1 booleans
 
 `--check-guardrails` conservatively rejects removal/modification of pre-existing *hard* constraints and deletion/reclassification of previously classified data assets. An empty selection for a `hard` constraint with `missing_evidence: fail` is invalid. This is an **offline consistency check, not an authorization decision**. It never verifies that the alleged baseline was approved by an authorized principal; signed policy snapshots, independent witnesses, separation of duties and immutable evidence remain deferred.
 
-For this alpha, numeric values may be integers in the inclusive range [-2^63, 2^64-1]. YAML floating-point values and integers outside this range are rejected before ArchIR serialization so that the Rust `serde_json` verifier can recompute the digest without lossy coercion. This is a temporary cross-language profile, not a permanent precision limit on the standard. Unsupported relationship fields are errors, never silently dropped.\n\nThe JSON schema in `spec/archir-v0.1.schema.json` constrains only the prototype interchange shape. It does not validate semantic relationships or substitute for compiler diagnostics. The canonical hash covers sorted, compact JSON of the normalized IR **without** the `sha256` metadata field; rules for Unicode and floating-point interoperability remain open for cross-language specification.
+For this alpha, numeric values may be integers in the inclusive range [-2^63, 2^64-1]. YAML floating-point values and integers outside this range are rejected before ArchIR serialization so that the Rust `serde_json` verifier can recompute the digest without lossy coercion. This is a temporary cross-language profile, not a permanent precision limit on the standard. Unsupported relationship fields are errors.
+
+The JSON schema in `spec/archir-v0.1.schema.json` constrains only the prototype interchange shape. It does not validate semantic relationships or substitute for compiler diagnostics. The canonical hash covers sorted, compact JSON of the normalized IR **without** the `sha256` metadata field.

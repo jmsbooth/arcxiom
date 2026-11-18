@@ -1,6 +1,6 @@
 # Arcxiom Rust kernel: draft 0.1 compatibility profile
 
-Status: **experimental; pre-standard; proposed for v0.2.0a1**. This profile freezes the existing published `0.1-draft` source and interchange contract for the Rust-first release. The release version is **not** the ArchIR version. Unsupported versions are rejected; no implicit migration occurs.
+Status: **experimental; pre-standard; implemented by the merged Rust kernel**. This profile freezes the existing published `0.1-draft` source and interchange contract for the Rust-first release. The release version is **not** the ArchIR version. Unsupported versions are rejected; no implicit migration occurs.
 
 ## Grammar and accepted subset
 
@@ -14,7 +14,7 @@ Inputs with symlinks in their path components are rejected; imports and external
 
 A successful export contains exactly `archir_version`, `namespace`, `entities`, `relationships`, `constraints`, and optional `sha256`. Entity shape: `{id,type,name,attributes}` where omitted `name` defaults to ID and additional source fields are preserved verbatim in `attributes`. Relationship shape: `{from,relation,to}`. Constraint shape: `{id,select,must,missing_evidence,enforcement}` with defaults `fail` and `hard`. Unmapped constraint `description` is intentionally rejected by the new compiler to avoid silent metadata loss; existing published example does not use it.
 
-Canonical JSON is recursive, compact (no insignificant whitespace), with object keys sorted by Unicode scalar value, arrays in normalized order, `ensure_ascii` escaping (non-ASCII code points as lowercase `\\u` escapes, supplementary code points as surrogate pairs), JSON boolean/null literals and base-10 integer tokens, and no floating-point values. Nodes sorted by ID, relationships by `(from,relation,to)`, rules by ID. SHA-256 is calculated from the UTF-8 encoding of this JSON **without** the `sha256` key. The in-memory IR may omit the digest until export; the `verify` command requires an explicit 64-hex-character `sha256` claim and rejects missing, malformed, or mismatched claims. A digest alone does not authenticate authorship. This matches the Python `json.dumps(sort_keys=True, ensure_ascii=True, separators=(",", ":"))` profile used by v0.1.0a1.
+Canonical JSON is recursive, compact (no insignificant whitespace), with object keys sorted by Unicode scalar value, arrays in normalized order, `ensure_ascii` escaping (U+007F and non-ASCII code points as lowercase `\\u` escapes, supplementary code points as surrogate pairs), JSON boolean/null literals and base-10 integer tokens, and no floating-point values. Nodes sorted by ID, relationships by `(from,relation,to)`, rules by ID. SHA-256 is calculated from the UTF-8 encoding of this JSON **without** the `sha256` key. The in-memory IR may omit the digest until export; the `verify` command requires an explicit 64-hex-character `sha256` claim and rejects missing, malformed, or mismatched claims. A digest alone does not authenticate authorship. This matches the Python `json.dumps(sort_keys=True, ensure_ascii=True, separators=(",", ":"))` profile used by v0.1.0a1.
 
 ## Semantic constraints and relation typing
 
@@ -29,3 +29,5 @@ Diagnostics are machine-readable `{code,severity,message,path}` records, sorted 
 ## Conformance boundary
 
 The frozen emergency-response fixture digest in `tests/fixtures/emergency-response.digest` is the authoritative v0.1 compatibility golden. Cross-platform Rust/Python parity, malicious input tests, and supply-chain review are **release gates**, not assumptions. The compiler interprets declared architecture facts; no runtime policy enforcement, standards compliance, baseline authenticity, or evidence provenance is implied.
+
+The [a1-to-a2 producer migration](../docs/releases/v0.2.0a2.md#migration-from-the-a1-rust-producer) covers a Rust discrepancy for U+007F. The published canonicalization profile and ArchIR edition remain stable.
