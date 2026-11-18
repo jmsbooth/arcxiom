@@ -1,39 +1,73 @@
-# v0.2.0a1 required GitHub governance (FOSS-593)
+# Arcxiom v0.2.0a1 governance - solo maintainer
 
-Status: **configuration proposal, not proof of enforcement.** GitHub repository settings are not enforced by files committed to a repository. The repository owner must apply the protection and release-environment settings, then capture API screenshots or JSON responses as acceptance evidence before merging this PR.
+Status: **owner-authorized, temporary solo-maintainer governance profile**. GitHub repository settings must be applied and verified by the owner. Committing this file or a JSON policy does not change live GitHub permissions.
 
-## Protect the main branch
+Repository: public FOSS repository jmsbooth/arcxiom. Maintainer: authenticated GitHub account jmsbooth. **Public visibility permits anybody to read/fork the code and submit pull requests; it does not grant push, merge, or release authority.** Limit write access to the owner and explicitly approved collaborators/Apps.
 
-After the PR checks have executed so GitHub recognizes each context, run with an authenticated repository administrator's GitHub CLI:
+## Main branch protection
 
-    gh api --method PUT repos/jmsbooth/arcxiom/branches/main/protection --input .github/main-protection.json
-    gh api repos/jmsbooth/arcxiom/branches/main --jq '.protected'
-    gh api repos/jmsbooth/arcxiom/branches/main/protection
+.github/main-protection.json is the canonical protection payload for this phase.
 
-The proposed file .github/main-protection.json requires up-to-date PR checks for all three Rust kernel OS jobs, the RustSec dependency audit, six Python compatibility matrix jobs and the wheel smoke job. It requires one non-author review (including review of the last push), stale-review dismissal, resolved conversations, linear history, no administrator bypass, no force pushes, and no branch deletions. Check the actual reported status names; change the JSON contexts if GitHub names differ. This policy will intentionally prevent a sole author from self-approving. Add an independent collaborator reviewer or reviewer team before activation. Do not weaken it simply to merge an unreviewed PR.
+- A pull request is required before merging to main. The required_pull_request_reviews object remains enabled with **zero required approvals** because GitHub cannot count a PR author's own review as an independent approval.
+- Branch must be current and pass all 11 versioned required GitHub Actions checks: Rust Linux/macOS/Windows, RustSec audit, six Python matrix checks, and wheel smoke. The live check entries should be associated with the expected GitHub Actions App.
+- Require conversation resolution, linear history, enforce administrator protection, and prohibit force pushes/deletions. No bypass allowances.
+- No approval is inferred from passing CI. The sole maintainer assumes review and release accountability, including for untrusted public PRs and privileged workflow changes.
+- Re-enable required non-author approval and last-push approval when a second trusted maintainer becomes available; update FOSS-593.
 
-**Do not apply the protection file until all required check names exist on the PR.** With a required check that has never run on the branch, GitHub will block all merges. Review and update for any third-party status collisions; provider-specific app IDs may be configured if required.
+On the owner's Mac after fetching this PR branch:
 
-## Require maintainer approval for release preparation
+    export REPO="jmsbooth/arcxiom"
+    gh auth status
+    git fetch origin
+    git switch feat/FOSS-594-rust-native-kernel
+    git pull --ff-only
+    gh api -X PUT "repos/$REPO/branches/main/protection" --input .github/main-protection.json
+    gh api "repos/$REPO/branches/main" --jq '.protected'
+    gh api "repos/$REPO/branches/main/protection" --jq '{required_pull_request_reviews,required_status_checks,enforce_admins,required_linear_history,required_conversation_resolution,allow_force_pushes,allow_deletions}'
 
-Repository Settings > Environments > arcxiom-release:
+Expected: protected=true; required_approving_review_count=0, require_last_push_approval=false, strict=true, enforce_admins.enabled=true, and all 11 checks. **Never set required_pull_request_reviews to null simply to unblock a PR**: that removes the PR requirement.
 
-- Create this environment.
-- Configure at least one trusted **independent** required reviewer; disable administrator bypass and self-review where supported.
-- Restrict deployment branches/tags to protected main and reviewed release workflow only.
-- Verify an unapproved run of Prepare v0.2.0a1 release draft (manual only) actually waits for reviewer approval. Do not treat a file named environment as enforcement without a protection rule.
+## Releases: separate affirmative owner actions
 
-The release workflow is manual only. It checks that the invoking account is the authorized maintainer, the input is exactly v0.2.0a1, and the supplied 40-character commit SHA is the checked-out main SHA. It re-runs locked builds/tests on Linux, macOS, and Windows, generates and verifies archive SHA-256 files, and **creates an unpublished draft prerelease**, never a public release. The maintainer must separately inspect and publish the draft after reviewing all evidence.
+The release workflow requires exact manual workflow_dispatch by jmsbooth on protected main. It requires the exact commit SHA and typed version acknowledgement, rebuilds/tests with locked dependencies on all three systems, checks archives, and **creates a draft prerelease only**. The owner separately inspects and publishes the draft.
 
-The branch should be merged into main **only after** an independent reviewer has approved the code and all required checks pass, and should be tagged/published **only after** separate maintainer release approval. Do not run the manual release workflow before these conditions.
+Configure the arcxiom-release environment with jmsbooth as the **sole required reviewer**, allowing self-review because the same account initiates the job. This provides a second explicit approval UI action by the authorized owner, but is **not independent security review**. Restrict deployment to protected branches:
 
-## Evidence to attach to FOSS-594
+    OWNER_ID=$(gh api user --jq '.id')
+    jq -n --argjson id "$OWNER_ID" '{wait_timer:0,prevent_self_review:false,reviewers:[{type:"User",id:$id}],deployment_branch_policy:{protected_branches:true,custom_branch_policies:false}}' |
+      gh api -X PUT "repos/$REPO/environments/arcxiom-release" --input -
+    gh api "repos/$REPO/environments/arcxiom-release" --jq '{name,protection_rules,deployment_branch_policy}'
 
-- Protected main branch status / exact branch protection API response.
-- Required check contexts with successful results on the merge SHA.
-- Independent PR reviewer identity and time; code and security review resolution.
-- Release environment reviewer rule and a blocked/unblocked test.
-- Exact SHA of approved main build, RustSec audit report, dependency inventory, candidate archive SHA256SUMS (each platform), and independently recomputed checksums.
-- Confirmation the release remains **draft** until explicit publication approval.
+Expected: a required_reviewers rule naming jmsbooth with prevent_self_review=false and a protected-branches deployment policy. If another account or prevent_self_review=true is configured, explicitly correct it. Disable admin bypass for the environment in GitHub Settings where supported.
 
-No approval, publication or runtime security evidence is implied by the current commits.
+Do not dispatch the release workflow before merge to test it: it only exists on main after merging and a successful run may create a draft release/tag. Test only during actual owner-authorized publication.
+
+## Least privilege for Actions and contributors
+
+Set default GITHUB_TOKEN permission to read, and disable approval of PRs by Actions (the release job separately requests contents:write):
+
+    gh api -X PUT "repos/$REPO/actions/permissions/workflow" -f default_workflow_permissions=read -F can_approve_pull_request_reviews=false
+    gh api "repos/$REPO/actions/permissions/workflow"
+
+Audit collaborators before revoking anything:
+
+    gh api --paginate "repos/$REPO/collaborators?affiliation=all&per_page=100" --jq '.[] | [.login,.permissions.admin,.permissions.push] | @tsv'
+
+For a specific non-approved collaborator confirmed by the owner, use gh api -X DELETE repos/OWNER/REPO/collaborators/USERNAME, substituting the actual account name. Do not invite jmsbooth as collaborator: the owner already has admin privileges.
+
+Inspect Settings > Integrations > GitHub Apps and Settings > Actions > General for write-enabled automation and tokens. Org-only branch protection writer restrictions are not available on this personal repository, so restrict privileged users through collaborators and installed GitHub Apps.
+
+Public contributors may fork and submit PRs but should not be invited as collaborators by default. Avoid pull_request_target jobs that execute untrusted contributor code or granting write permissions to fork PR workflows.
+
+## FOSS-593 and FOSS-594 acceptance evidence
+
+- Protected main API response showing PR requirement, zero mandatory reviewers, exact CI checks with the expected GitHub App, admin enforcement and no bypass, force pushes, or deletions.
+- Read-only default workflow token, no Actions-generated PR approvals, and reviewed collaborator and GitHub App permissions.
+- arcxiom-release environment with only jmsbooth as required reviewer, self-review allowed, protected-branch-only deployments.
+- Green current-head CI, RustSec, Python, wheel, native release ZIP and SHA256SUMS; verify the exact source SHA.
+- Explicit maintainer acceptance in the PR or FOSS-594 as a SOLO-maintainer security review, never presented as independent certification.
+- Manual release dispatch after merge, followed by a separate draft publication decision.
+
+**Residual risk:** compromise of the single maintainer account could authorize code and release after the checks pass. Use phishing-resistant MFA/passkeys, limit tokens and apps, and audit repository events. Automated RustSec/CI does not substitute for independent code audit. Reintroduce review when a second maintainer becomes available.
+
+This exception applies to Arcxiom v0.2.0a1 only. It does not waive mandatory CI or grant runtime security assurance.
