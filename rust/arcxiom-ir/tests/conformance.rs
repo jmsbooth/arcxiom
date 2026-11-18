@@ -96,23 +96,24 @@ fn data_flow_references_are_typed() {
 }
 #[test]
 fn security_constraint_is_fail_closed() {
-    let baseline = valid(PUBLISHED);
-    let unencrypted = PUBLISHED.replace(
+    let published = published.replace("\r\n", "\n");
+    let baseline = valid(&published);
+    let unencrypted = published.replace(
         "    transport_encrypted: true\nrelationships:",
         "    transport_encrypted: false\nrelationships:",
     );
     error(&unencrypted, "AXC005");
-    let missing = PUBLISHED.replace(
+    let missing = published.replace(
         "    transport_encrypted: true\nrelationships:",
         "relationships:",
     );
     error(&missing, "AXC004");
-    let unused = PUBLISHED.replace(
+    let unused = published.replace(
         "    classification: restricted\n  - id: flow.incident-submission",
         "    classification: public\n  - id: flow.incident-submission",
     );
     error(&unused, "AXC008");
-    let removed = PUBLISHED.replace("enforcement: hard", "enforcement: advisory");
+    let removed = published.replace("enforcement: hard", "enforcement: advisory");
     let diff = guardrail_delta(&baseline, &valid(&removed));
     assert_eq!(diff[0]["code"], "AXG002");
 }
