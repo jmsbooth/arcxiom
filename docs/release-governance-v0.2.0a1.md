@@ -49,6 +49,13 @@ Set default GITHUB_TOKEN permission to read, and disable approval of PRs by Acti
     gh api -X PUT "repos/$REPO/actions/permissions/workflow" -f default_workflow_permissions=read -F can_approve_pull_request_reviews=false
     gh api "repos/$REPO/actions/permissions/workflow"
 
+For public FOSS, **require jmsbooth to approve every outside contributor's fork-PR workflow before CI starts**. GitHub's default first-time-contributor policy is weaker because previously merged external contributors can run CI without new approval. This setting preserves public PR submissions while preventing unapproved external workflow execution:
+
+    gh api -X PUT "repos/$REPO/actions/permissions/fork-pr-contributor-approval" -f approval_policy=all_external_contributors
+    gh api "repos/$REPO/actions/permissions/fork-pr-contributor-approval" --jq '.approval_policy'
+
+Expected output: all_external_contributors. An external PR's required checks may wait until the owner approves its workflow run; this is intentional. This policy does not block issues, forks, or PR submissions.
+
 Audit collaborators before revoking anything:
 
     gh api --paginate "repos/$REPO/collaborators?affiliation=all&per_page=100" --jq '.[] | [.login,.permissions.admin,.permissions.push] | @tsv'
@@ -62,7 +69,7 @@ Public contributors may fork and submit PRs but should not be invited as collabo
 ## FOSS-593 and FOSS-594 acceptance evidence
 
 - Protected main API response showing PR requirement, zero mandatory reviewers, exact CI checks with the expected GitHub App, admin enforcement and no bypass, force pushes, or deletions.
-- Read-only default workflow token, no Actions-generated PR approvals, and reviewed collaborator and GitHub App permissions.
+- Read-only default workflow token, no Actions-generated PR approvals, mandatory approval for all external contributor workflow runs, and reviewed collaborator and GitHub App permissions.
 - arcxiom-release environment with only jmsbooth as required reviewer, self-review allowed, protected-branch-only deployments.
 - Green current-head CI, RustSec, Python, wheel, native release ZIP and SHA256SUMS; verify the exact source SHA.
 - Explicit maintainer acceptance in the PR or FOSS-594 as a SOLO-maintainer security review, never presented as independent certification.
