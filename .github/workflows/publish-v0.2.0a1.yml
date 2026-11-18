@@ -23,7 +23,13 @@ jobs:
     name: Human initiation and exact commit gate
     if: github.repository == 'jmsbooth/arcxiom' && github.actor == 'jmsbooth' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
+      - name: Require actual main protection before release preparation
+        shell: bash
+        run: |
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.protected')" = 'true'
       - name: Reject incorrect commit or typed approval
         env:
           EXPECTED: ${{ inputs.approved_commit }}
