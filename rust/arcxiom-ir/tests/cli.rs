@@ -152,3 +152,12 @@ fn verifier_caps_oversized_ir_files_before_deserialization() {
     let _ = fs::remove_file(path);
     let _ = fs::remove_dir(dir);
 }
+
+#[test]
+fn verify_rejects_directory_without_blocking() {
+    let dir = test_dir("verify-directory");
+    let status = command(&["verify", dir.to_str().unwrap()]);
+    assert_eq!(status.status.code(), Some(2), "{status:?}");
+    assert!(String::from_utf8_lossy(&status.stderr).contains("AXIR20"));
+    let _ = fs::remove_dir(dir);
+}
