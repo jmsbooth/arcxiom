@@ -4,9 +4,9 @@
 
 Arcxiom is an experimental, vendor-neutral Architecture-as-Code project for modeling, querying, validating and rendering architectures across software, hardware, systems-of-systems, services, organizations, actors, missions and business capabilities.
 
-**Current status: v0.1.0a1 alpha reference prototype.** The source format and ArchIR are **draft contracts**, not a published or independently conformant standard. This prototype is intentionally narrow and implemented in Python to validate semantics rapidly. A Rust reference core remains the target for production.
+**Published baseline: v0.1.0a1. Next release candidate: v0.2.0a1 (Rust-Native Architecture Kernel, in draft PR).** The .arch.yaml language and ArchIR remain **experimental 0.1-draft contracts**, not a completed standard or certified security control. Rust is becoming the authoritative source compiler; the shipped Python package remains the reference/compatibility implementation and the generic PDF adapter. The release candidate is not yet approved or published.
 
-## Run the prototype
+## Run the published Python v0.1.0a1 reference
 
 Python 3.11+ is required. Install in a virtual environment:
 
@@ -45,7 +45,8 @@ The prototype checks type membership, duplicate IDs, references, a small rule gr
 
 ## Repository organization
 
-- `src/arcxiom/`: Python prototype parser, ArchIR builder, graph query engine, CLI, and standards-neutral PDF schematic renderer.
+- `rust/arcxiom-ir/`: Rust-native alpha architecture compiler, typed graph, canonicalization and portable CLI.
+- `src/arcxiom/`: Python 0.1 reference parser, graph utilities, CLI, and standards-neutral PDF schematic adapter.
 - `tests/`: runnable positive, negative, security and deterministic-output tests.
 - `examples/`: executable `.arch.yaml` files.
 - `spec/`: evolving draft contract, separate from any implementation.
@@ -58,18 +59,22 @@ The prototype checks type membership, duplicate IDs, references, a small rule gr
 - **Interchange:** versioned ArchIR graph with deterministic JSON and SHA-256 content digest.
 - **Model:** typed entities, directed relationships, requirements/constraints and future evidence links.
 - **Tooling:** `validate`, `query`, `export`, generic `render --format pdf`, and conservative `diff --check-guardrails` are implemented in limited form.
-- **Deferred:** module imports, LSP, formal type profiles and semantics, verified evidence, baseline approvals, agent MCP, Rust core, physical geometry, multi-sheet technical drafting, ISO/BS/NCS conformance and independent implementation testing.
+- **Deferred:** module imports, LSP, formal type profiles and semantics, verified evidence, baseline approvals, agent MCP, physical geometry, multi-sheet technical drafting, ISO/BS/NCS conformance and independent implementation testing.
 
-## Independent Rust ArchIR verifier
+## Rust-native kernel (v0.2.0a1 candidate)
 
-A preliminary **Rust 1.85** JSON verifier is included at [`rust/arcxiom-ir/`](rust/arcxiom-ir/). It independently checks normalized ArchIR graph structure and recomputes the Python-exported canonical digest. A separate GitHub Actions matrix qualifies Python/Rust digest parity on Linux, Windows and macOS.
+The Rust 1.85 crate at [rust/arcxiom-ir/](rust/arcxiom-ir/) builds a portable `arcxiom` executable with native YAML compilation, typed graph validation, deterministic canonical ArchIR, digest verification, query traversal and semantic diff. This is the target implementation for the next alpha, **not yet a published release**.
 
 ```bash
-arcxiom export examples/emergency-response.arch.yaml --output example-archir.json
-cargo run --manifest-path rust/arcxiom-ir/Cargo.toml -- verify example-archir.json
+cargo build --locked --release --manifest-path rust/arcxiom-ir/Cargo.toml
+rust/arcxiom-ir/target/release/arcxiom validate examples/emergency-response.arch.yaml --json
+rust/arcxiom-ir/target/release/arcxiom export examples/emergency-response.arch.yaml -o archir.json
+rust/arcxiom-ir/target/release/arcxiom query examples/emergency-response.arch.yaml --id role.dispatcher --depth 8 --json
+rust/arcxiom-ir/target/release/arcxiom diff examples/emergency-response.arch.yaml examples/emergency-response.arch.yaml --check-guardrails --json
+cargo test --locked --manifest-path rust/arcxiom-ir/Cargo.toml --all-targets
 ```
 
-This is **not** the complete Rust compiler, YAML parser or approved-policy verifier. The Rust digest validator deliberately rejects floating-point values until a cross-language numeric canonicalization profile is specified. See [Rust verifier limits](docs/rust-archir.md).
+Windows builds produce `arcxiom.exe`. Existing `python -m arcxiom` and the Python wheel still expose the original v0.1.0a1 reference behavior and PDF rendering; they are **not aliases for the Rust executable**. For the draft grammar and canonicalization rules, see [the versioned compatibility contract](spec/archyaml-v0.1-compat.md). For explicit release blockers and exclusions, see [v0.2.0a1 release notes](docs/releases/v0.2.0a1.md). The Rust compiler does not run Python.
 
 ## Initial alpha distribution
 
