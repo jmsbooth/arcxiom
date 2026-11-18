@@ -7,6 +7,11 @@ on:
 permissions:
   contents: read
 
+# Only the latest PR HEAD should consume multi-platform runner minutes.
+concurrency:
+  group: rust-kernel-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   rust-kernel:
     name: kernel / ${{ matrix.os }}
@@ -57,12 +62,16 @@ jobs:
         run: |
           python -m pip install -e .
           python -m arcxiom export examples/emergency-response.arch.yaml -o python-archir.json
+          python -m arcxiom export examples/zero-trust-federation.arch.yaml -o python-federation.json
           python -m arcxiom query examples/emergency-response.arch.yaml --id role.dispatcher --direction outgoing --depth 8 --json > python-query.json
+          python -m arcxiom query examples/zero-trust-federation.arch.yaml --id role.data-steward --depth 8 --json > python-federation-query.json
           python -m arcxiom diff examples/emergency-response.arch.yaml examples/emergency-response.arch.yaml --json > python-diff.json
           if [ "$RUNNER_OS" = "Windows" ]; then EXE=rust/arcxiom-ir/target/release/arcxiom.exe; else EXE=rust/arcxiom-ir/target/release/arcxiom; fi
           "$EXE" query examples/emergency-response.arch.yaml --id role.dispatcher --direction outgoing --depth 8 --json > rust-query.json
+          "$EXE" export examples/zero-trust-federation.arch.yaml -o rust-federation.json
+          "$EXE" query examples/zero-trust-federation.arch.yaml --id role.data-steward --depth 8 --json > rust-federation-query.json
           "$EXE" diff examples/emergency-response.arch.yaml examples/emergency-response.arch.yaml --json > rust-diff.json
-          python -c 'import json; from pathlib import Path; j=lambda p:json.loads(Path(p).read_text()); assert j("python-archir.json")==j("rust-archir.json"); assert j("python-query.json")==j("rust-query.json"); assert j("python-diff.json")==j("rust-diff.json")'
+          python -c 'import json; from pathlib import Path; j=lambda p:json.loads(Path(p).read_text()); assert j("python-archir.json")==j("rust-archir.json"); assert j("python-federation.json")==j("rust-federation.json"); assert j("python-query.json")==j("rust-query.json"); assert j("python-federation-query.json")==j("rust-federation-query.json"); assert j("python-diff.json")==j("rust-diff.json")'
       - name: Stage installable release-candidate binary with checksum and dependency inventory
         shell: bash
         run: |
