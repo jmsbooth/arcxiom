@@ -23,6 +23,10 @@ jobs:
     name: Human initiation and exact commit gate
     if: github.repository == 'jmsbooth/arcxiom' && github.actor == 'jmsbooth' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -50,6 +54,20 @@ jobs:
           assert pathlib.Path('docs/releases/v0.2.0a1.md').is_file()
           assert pathlib.Path('rust/arcxiom-ir/Cargo.lock').is_file()
           PY
+      - name: Validate exact main SHA against all required CI and merged PR provenance
+        shell: bash
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/branches/main" > "$RUNNER_TEMP/arcxiom-branch.json"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?per_page=100" \
+            --jq '.check_runs[] | @json' > "$RUNNER_TEMP/arcxiom-checks.ndjson"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls?per_page=100" \
+            --jq '.[] | @json' > "$RUNNER_TEMP/arcxiom-pulls.ndjson"
+          python scripts/verify_release_qualification.py \
+            --sha "$GITHUB_SHA" \
+            --branch "$RUNNER_TEMP/arcxiom-branch.json" \
+            --checks "$RUNNER_TEMP/arcxiom-checks.ndjson" \
+            --pulls "$RUNNER_TEMP/arcxiom-pulls.ndjson" \
+            --policy .github/main-protection.json
   build:
     name: Exact-source matrix artifact / ${{ matrix.os }}
     needs: verify-approval
