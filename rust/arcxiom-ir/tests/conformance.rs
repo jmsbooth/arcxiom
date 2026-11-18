@@ -403,3 +403,15 @@ fn ambiguous_numeric_spellings_must_not_be_coerced() {
         }
     }
 }
+
+#[test]
+fn file_loader_rejects_oversized_source_before_yaml_parsing() {
+    let dir = std::env::temp_dir()
+        .canonicalize()
+        .expect("resolve system temp root");
+    let path = dir.join(format!("arcxiom-oversize-{}.arch.yaml", std::process::id()));
+    std::fs::write(&path, vec![b'a'; arcxiom_ir::MAX_BYTES + 1]).unwrap();
+    let result = arcxiom_ir::compile_file(&path);
+    let _ = std::fs::remove_file(path);
+    assert_eq!(result.diagnostics[0].code, "AXY011");
+}
