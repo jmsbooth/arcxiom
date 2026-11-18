@@ -97,7 +97,10 @@ fn data_flow_references_are_typed() {
 #[test]
 fn security_constraint_is_fail_closed() {
     let baseline = valid(PUBLISHED);
-    let unencrypted = PUBLISHED.replace("    transport_encrypted: true\nrelationships:", "    transport_encrypted: false\nrelationships:");
+    let unencrypted = PUBLISHED.replace(
+        "    transport_encrypted: true\nrelationships:",
+        "    transport_encrypted: false\nrelationships:",
+    );
     error(&unencrypted, "AXC005");
     let missing = PUBLISHED.replace(
         "    transport_encrypted: true\nrelationships:",
