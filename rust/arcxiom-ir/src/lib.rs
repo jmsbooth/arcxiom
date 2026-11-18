@@ -259,7 +259,7 @@ fn nondecimal_integer_token(token: &str) -> bool {
             return digits.chars().any(|ch| ch != '_')
                 && digits
                     .chars()
-                    .all(|ch| ch == '_' || ch.to_digit(radix).is_some());
+                    .all(|ch| ch == '_' || ch.is_digit(radix));
         }
     }
     false
