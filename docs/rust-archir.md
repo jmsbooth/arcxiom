@@ -1,8 +1,13 @@
-Rust ArchIR checker (experimental)
-====================================
+# Rust architecture kernel
 
-The Rust 1.85 crate is an independent, offline structural verifier of the JSON produced by the Python Arcxiom prototype. It is **not** a YAML parser, policy authority, baseline approval mechanism, verified evidence engine, CAD exporter or ISO/BS/NCS conformance implementation.
+The Rust 1.89 crate builds the authoritative single-file YAML compiler and ArchIR verifier. It supports `validate`, `export`, `verify`, `query` and `diff`. Python provides a separate compatibility implementation and the generic schematic PDF adapter. The merged a1 kernel and its public distribution have separate gates.
 
-Run `arcxiom export examples/emergency-response.arch.yaml --output example-archir.json`, then `cargo run --manifest-path rust/arcxiom-ir/Cargo.toml -- verify example-archir.json`.
+Build and run the Rust implementation from the repository root:
 
-The cross-language digest contract currently covers JSON integers in [-2^63, 2^64-1]; Python source validation now rejects floats and out-of-range integers. Rust refuses floats pending an independently specified numeric canonicalization. The GitHub Rust test matrix cross-checks against the frozen Python digest fixture. This is an experimental pre-standard alpha artifact.
+```sh
+cargo build --locked --release --manifest-path rust/arcxiom-ir/Cargo.toml
+rust/arcxiom-ir/target/release/arcxiom export examples/emergency-response.arch.yaml -o example-archir.json
+rust/arcxiom-ir/target/release/arcxiom verify example-archir.json
+```
+
+The hash covers the normalized graph under the [0.1-draft compatibility profile](../spec/archyaml-v0.1-compat.md). See the [a2 qualification scope and producer migration](releases/v0.2.0a2.md) for the shared corpus and limits of the evidence.

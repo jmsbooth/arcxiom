@@ -1,6 +1,6 @@
 # ADR-0002: Python end-to-end spike; Rust remains the target reference core
 
-**Status:** Accepted for v0.1 prototype only. Supersedes no normative specification decision.
+**Status:** Accepted for v0.1 prototype only. The Rust kernel subsequently merged in [PR #2](https://github.com/jmsbooth/arcxiom/pull/2). The following records the original prototype decision. See the [current kernel](../rust-archir.md).
 
 ## Context
 

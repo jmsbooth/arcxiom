@@ -9,10 +9,25 @@ import argparse
 import hashlib
 import pathlib
 import platform
+import re
+import subprocess
+import tomllib
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-RELEASE_FILES = ("LICENSE", "spec/archyaml-v0.1-compat.md", "docs/releases/v0.2.0a1.md")
+MANIFEST = ROOT / "rust" / "arcxiom-ir" / "Cargo.toml"
+
+
+def candidate_version(binary: pathlib.Path) -> str:
+    with MANIFEST.open("rb") as manifest_file:
+        version = tomllib.load(manifest_file)["package"]["version"]
+    match = re.fullmatch(r"(\d+\.\d+\.\d+)-alpha\.(\d+)", version)
+    if not match:
+        raise ValueError(f"Unsupported candidate version: {version}")
+    banner = subprocess.check_output([str(binary), "--version"], text=True).strip()
+    if banner.split(" | ")[0] != f"arcxiom {version}":
+        raise ValueError(f"Binary and Cargo manifest versions disagree: {banner}")
+    return f"v{match[1]}a{match[2]}"
 
 
 def create_archive(output: pathlib.Path) -> pathlib.Path:
@@ -25,16 +40,18 @@ def create_archive(output: pathlib.Path) -> pathlib.Path:
     binary = ROOT / "rust" / "arcxiom-ir" / "target" / "release" / binary_name
     if not binary.is_file():
         raise FileNotFoundError(f"Native CLI missing: {binary}")
-    for name in RELEASE_FILES:
+    release = candidate_version(binary)
+    release_files = ("LICENSE", "spec/archyaml-v0.1-compat.md", f"docs/releases/{release}.md")
+    for name in release_files:
         if not (ROOT / name).is_file():
             raise FileNotFoundError(f"Required release metadata missing: {name}")
     output.mkdir(parents=True, exist_ok=True)
-    archive = output / f"arcxiom-v0.2.0a1-{system}-{machine}.zip"
+    archive = output / f"arcxiom-{release}-{system}-{machine}.zip"
     digest_file = output / f"SHA256SUMS.{system}"
     if archive.exists() or digest_file.exists():
         raise FileExistsError("Release archive/checksum already exists; refuse overwrite")
     members = [(binary_name, binary.read_bytes(), 0o100755)]
-    members.extend((name, (ROOT / name).read_bytes(), 0o100644) for name in RELEASE_FILES)
+    members.extend((name, (ROOT / name).read_bytes(), 0o100644) for name in release_files)
     with zipfile.ZipFile(archive, "x", compression=zipfile.ZIP_DEFLATED) as z:
         for name, data, mode in members:
             entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
