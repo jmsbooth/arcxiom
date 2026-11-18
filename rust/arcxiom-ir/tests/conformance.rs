@@ -107,7 +107,10 @@ fn security_constraint_is_fail_closed() {
         "relationships:",
     );
     error(&missing, "AXC004");
-    let unused = PUBLISHED.replace("classification: restricted", "classification: public");
+    let unused = PUBLISHED.replace(
+        "    classification: restricted\n  - id: flow.incident-submission",
+        "    classification: public\n  - id: flow.incident-submission",
+    );
     error(&unused, "AXC008");
     let removed = PUBLISHED.replace("enforcement: hard", "enforcement: advisory");
     let diff = guardrail_delta(&baseline, &valid(&removed));
