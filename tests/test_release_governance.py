@@ -61,8 +61,12 @@ def test_branch_protection_check_names_match_workflows():
     required = policy["required_status_checks"]
     assert required["strict"] is True
     assert policy["enforce_admins"] is True
-    assert policy["required_pull_request_reviews"]["required_approving_review_count"] >= 1
-    assert policy["required_pull_request_reviews"]["require_last_push_approval"] is True
+    # Solo-maintainer FOSS posture: PRs/CI remain mandatory; self-review is
+    # impossible for GitHub PRs, so no independent approval is required yet.
+    assert policy["required_pull_request_reviews"] is not None
+    assert policy["restrictions"] is None  # personal GitHub repository
+    assert policy["required_pull_request_reviews"]["required_approving_review_count"] == 0
+    assert policy["required_pull_request_reviews"]["require_last_push_approval"] is False
     assert policy["required_pull_request_reviews"]["dismiss_stale_reviews"] is True
     assert policy["required_linear_history"] is True
     assert policy["allow_force_pushes"] is False
