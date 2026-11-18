@@ -415,3 +415,18 @@ fn file_loader_rejects_oversized_source_before_yaml_parsing() {
     let _ = std::fs::remove_file(path);
     assert_eq!(result.diagnostics[0].code, "AXY011");
 }
+
+#[test]
+fn verifier_requires_claimed_sha256_not_just_semantically_valid_json() {
+    let ir = valid(PUBLISHED);
+    let no_claim = serde_json::to_vec(&ir).unwrap();
+    let err = verify_json(&no_claim).unwrap_err();
+    assert!(err.contains("AXIR09"), "{err}");
+    let mut exported: Value = serde_json::from_str(&export(&ir).unwrap()).unwrap();
+    exported["sha256"] = json!("bad");
+    let err = verify_json(&serde_json::to_vec(&exported).unwrap()).unwrap_err();
+    assert!(err.contains("AXIR09"), "{err}");
+    exported["sha256"] = json!("0".repeat(64));
+    let err = verify_json(&serde_json::to_vec(&exported).unwrap()).unwrap_err();
+    assert!(err.contains("AXIR19"), "{err}");
+}
