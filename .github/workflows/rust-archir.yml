@@ -106,6 +106,23 @@ jobs:
           (out/"cargo-metadata.json").write_text(json.dumps(metadata,sort_keys=True,indent=2)+"\n")
           assert hashlib.sha256(dest.read_bytes()).hexdigest()==checksum
           PY
+      - name: Dry-run exact maintainer-release ZIP packaging and checksums
+        shell: bash
+        run: |
+          python scripts/package_release.py --output dist
+          python - <<'PY'
+          import hashlib,pathlib,zipfile
+          out=pathlib.Path("dist")
+          archives=list(out.glob("arcxiom-v0.2.0a1-*.zip"))
+          manifests=list(out.glob("SHA256SUMS.*"))
+          assert len(archives)==len(manifests)==1
+          claim,filename=manifests[0].read_text().strip().split()
+          assert filename==archives[0].name
+          assert claim==hashlib.sha256(archives[0].read_bytes()).hexdigest()
+          with zipfile.ZipFile(archives[0]) as archive:
+              assert archive.testzip() is None
+              assert any(name.endswith("arcxiom") or name.endswith("arcxiom.exe") for name in archive.namelist())
+          PY
       - name: Store nonpublished candidate binaries and audit evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
