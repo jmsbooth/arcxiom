@@ -1,6 +1,9 @@
 """Contract tests for GitHub release governance; do not claim to enforce settings."""
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import yaml
@@ -90,3 +93,28 @@ def test_release_validation_uses_pinned_dependencies_and_no_pr_write_token():
     assert rust["permissions"] == {"contents": "read"}
     assert "pull_request" in rust["on"]
     assert "push" in rust["on"]
+
+def test_actual_approval_shell_rejects_wrong_commit_acknowledgement_and_length():
+    # Windows runner validates the exact workflow content above; Linux/macOS
+    # additionally execute the real Bash assertions in the release job.
+    if sys.platform == "win32":
+        return
+    workflow = _workflow(WORKFLOW)
+    approval = workflow["jobs"]["verify-approval"]
+    script = next(step["run"] for step in approval["steps"]
+                  if step.get("name") == "Reject incorrect commit or typed approval")
+    sha = "a" * 40
+    cases = [
+        (sha, sha, "v0.2.0a1", 0),
+        (sha, "b" * 40, "v0.2.0a1", 1),
+        (sha, sha, "not-approved", 1),
+        (sha[:39], sha[:39], "v0.2.0a1", 1),
+    ]
+    for actual, expected, confirmation, expected_success in cases:
+        env = dict(os.environ, GITHUB_SHA=actual, EXPECTED=expected,
+                   CONFIRMATION=confirmation)
+        completed = subprocess.run(["bash", "-e", "-c", script],
+                                   env=env, check=False, capture_output=True)
+        assert (completed.returncode == 0) == (expected_success == 0), (
+            actual, expected, confirmation, completed.stderr
+        )
