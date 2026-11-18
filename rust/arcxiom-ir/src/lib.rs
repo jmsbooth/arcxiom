@@ -434,9 +434,7 @@ fn bounded_json(value: &Value, depth: usize) -> bool {
             a.len() <= MAX_ENTITIES + MAX_RELATIONSHIPS + MAX_CONSTRAINTS
                 && a.iter().all(|v| bounded_json(v, depth + 1))
         }
-        Value::Object(m) => {
-            m.len() <= 4096 && m.values().all(|v| bounded_json(v, depth + 1))
-        }
+        Value::Object(m) => m.len() <= 4096 && m.values().all(|v| bounded_json(v, depth + 1)),
     }
 }
 
@@ -1017,7 +1015,10 @@ pub fn verify_json(bytes: &[u8]) -> Result<String, String> {
     // checksum. Reconstruct the source document from the strict interchange
     // shape and ask the authoritative compiler to validate it again.
     let mut source_nodes = Vec::new();
-    for entity in ir["entities"].as_array().ok_or("AXIR02: missing entities")? {
+    for entity in ir["entities"]
+        .as_array()
+        .ok_or("AXIR02: missing entities")?
+    {
         let mut node = entity["attributes"]
             .as_object()
             .ok_or("AXIR13: invalid attributes")?
@@ -1039,8 +1040,14 @@ pub fn verify_json(bytes: &[u8]) -> Result<String, String> {
     });
     let checked = compile_document(&source);
     if !checked.valid() {
-        let first = checked.diagnostics.first().ok_or("AXIR21: rejected semantic graph")?;
-        return Err(format!("AXIR21: {} {}: {}", first.code, first.path, first.message));
+        let first = checked
+            .diagnostics
+            .first()
+            .ok_or("AXIR21: rejected semantic graph")?;
+        return Err(format!(
+            "AXIR21: {} {}: {}",
+            first.code, first.path, first.message
+        ));
     }
     if checked.ir.as_ref() != Some(&ir) {
         return Err("AXIR22: noncanonical entity, relationship or constraint ordering".into());
