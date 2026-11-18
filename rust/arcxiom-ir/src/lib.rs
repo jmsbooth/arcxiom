@@ -1024,9 +1024,9 @@ pub fn verify_json(bytes: &[u8]) -> Result<String, String> {
         .0;
     de.end().map_err(|e| format!("AXIR08: {e}"))?;
     let claimed = match ir.get("sha256") {
-        None => None,
-        Some(Value::String(s)) => Some(s.clone()),
-        _ => return Err("AXIR09: sha256 must be text".into()),
+        None => return Err("AXIR09: missing sha256 digest claim".into()),
+        Some(Value::String(s)) if s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit()) => s.clone(),
+        _ => return Err("AXIR09: sha256 must be a 64-digit hex digest".into()),
     };
     let obj = ir.as_object_mut().ok_or("AXIR04: expected object")?;
     obj.remove("sha256");
@@ -1123,7 +1123,7 @@ pub fn verify_json(bytes: &[u8]) -> Result<String, String> {
         }
     }
     let computed = digest(&ir)?;
-    if claimed.is_some_and(|v| v != computed) {
+    if claimed != computed {
         return Err("AXIR19: digest mismatch".into());
     }
     // Verify semantic consistency and normalization, not merely a self-asserted
