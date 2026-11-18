@@ -1,7 +1,7 @@
 //! Portable Arcxiom CLI. Rust is the authoritative source compiler.
-use arcxiom_ir::{compile_file, diff, export, guardrail_delta, query, verify_json, Compiled};
+use arcxiom_ir::{compile_file, diff, export, guardrail_delta, query, verify_json, Compiled, MAX_BYTES};
 use serde_json::json;
-use std::{env, fs, path::Path, process};
+use std::{env, fs, io::Read, path::Path, process};
 
 fn usage() -> String {
     "usage: arcxiom <validate|export|query|diff|verify> [path(s)] [options]\n\
@@ -228,7 +228,12 @@ fn main_run(args: &[String]) -> Result<i32, (i32, String)> {
             if opts.positional.len() != 1 {
                 return Err((64, usage()));
             }
-            let data = fs::read(&opts.positional[0]).map_err(|e| (2, format!("AXIR20: {e}")))?;
+            let file = fs::File::open(&opts.positional[0])
+                .map_err(|e| (2, format!("AXIR20: {e}")))?;
+            let mut data = Vec::new();
+            file.take((4 * MAX_BYTES + 1) as u64)
+                .read_to_end(&mut data)
+                .map_err(|e| (2, format!("AXIR20: {e}")))?;
             let hash = verify_json(&data).map_err(|e| (2, e))?;
             println!("sha256:{hash}");
             Ok(0)
