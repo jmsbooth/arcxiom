@@ -257,9 +257,7 @@ fn nondecimal_integer_token(token: &str) -> bool {
     for (prefix, radix) in [("0x", 16u32), ("0o", 8), ("0b", 2)] {
         if let Some(digits) = lower.strip_prefix(prefix) {
             return digits.chars().any(|ch| ch != '_')
-                && digits
-                    .chars()
-                    .all(|ch| ch == '_' || ch.is_digit(radix));
+                && digits.chars().all(|ch| ch == '_' || ch.is_digit(radix));
         }
     }
     false
