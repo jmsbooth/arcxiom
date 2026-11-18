@@ -916,7 +916,7 @@ pub fn verify_json(bytes: &[u8]) -> Result<String, String> {
         if !ident(id)
             || !ids.insert(id.to_owned())
             || !field(entity, "type").is_some_and(|t| TYPES.contains(&t))
-            || !field(entity, "name").is_some_and(|n| !n.is_empty())
+            || field(entity, "name").is_none_or(|n| n.is_empty())
             || !entity["attributes"].is_object()
         {
             return Err("AXIR13: invalid entity".into());
@@ -966,8 +966,8 @@ pub fn verify_json(bytes: &[u8]) -> Result<String, String> {
         let id = field(rule, "id").ok_or("AXIR16: missing rule id")?;
         if !ident(id)
             || !rules.insert(id)
-            || !rule["select"].as_object().is_some_and(|v| !v.is_empty())
-            || !rule["must"].as_object().is_some_and(|v| !v.is_empty())
+            || rule["select"].as_object().is_none_or(|v| v.is_empty())
+            || rule["must"].as_object().is_none_or(|v| v.is_empty())
             || !field(rule, "missing_evidence").is_some_and(|v| ["fail", "warn"].contains(&v))
             || !field(rule, "enforcement").is_some_and(|v| ["hard", "advisory"].contains(&v))
         {
