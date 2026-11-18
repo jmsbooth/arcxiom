@@ -1,132 +1,309 @@
-//! Experimental Rust checker for normalized Arcxiom 0.1 ArchIR, not a PDP.
-use serde_json::Value;
-use sha2::{Digest,Sha256};
-use std::{collections::HashSet,env,fs,process};
+//! Portable Arcxiom CLI. Rust is the authoritative source compiler.
+use arcxiom_ir::{
+    compile_file, diff, export, guardrail_delta, query, verify_json, Compiled, MAX_BYTES,
+};
+use serde_json::json;
+use std::{env, fs, io::Read, path::Path, process};
 
-fn field<'a>(v:&'a Value,k:&str)->Result<&'a str,String>{
-    v.get(k).and_then(Value::as_str).ok_or(format!("AXIR01: invalid {k}"))
+fn usage() -> String {
+    "usage: arcxiom <validate|export|query|diff|verify> [path(s)] [options]\n\
+     validate FILE [--json]\n\
+     export FILE [--format json] [-o|--output FILE]\n\
+     query FILE --id ID [--direction incoming|outgoing|both] [--depth 0..10] [--json]\n\
+     diff BASELINE CANDIDATE [--check-guardrails] [--json]\n\
+     verify ARCHIR.json\n\
+     exit codes: 0 success/identical, 2 invalid source/guardrail, 3 changes, 64 usage"
+        .into()
 }
-fn list<'a>(v:&'a Value,k:&str,max:usize)->Result<&'a Vec<Value>,String>{
-    let a=v.get(k).and_then(Value::as_array).ok_or(format!("AXIR02: invalid {k}"))?;
-    if a.len()>max{return Err(format!("AXIR03: too many {k}"));}
-    Ok(a)
+#[derive(Default)]
+struct Options {
+    json: bool,
+    format: Option<String>,
+    output: Option<String>,
+    id: Option<String>,
+    direction: Option<String>,
+    depth: Option<usize>,
+    guardrails: bool,
+    positional: Vec<String>,
 }
-fn shape(v:&Value,keys:&[&str])->Result<(),String>{
-    let m=v.as_object().ok_or("AXIR04: expected object")?;
-    if m.len()!=keys.len()||m.keys().any(|k|!keys.contains(&k.as_str())){
-        return Err("AXIR05: unexpected or missing fields".into());
-    }
-    Ok(())
-}
-fn ident(s:&str)->bool{
-    !s.is_empty()&&s.len()<=128&&s.chars().next().is_some_and(|c|c.is_ascii_alphabetic())
-        &&s.chars().all(|c|c.is_ascii_alphanumeric()||"._-".contains(c))
-}
-fn canon(v:&Value)->Result<String,String>{
-    match v{
-        Value::Null=>Ok("null".into()),
-        Value::Bool(b)=>Ok(b.to_string()),
-        Value::Number(n) if n.is_i64()||n.is_u64()=>Ok(n.to_string()),
-        Value::Number(_)=>Err("AXIR06: float canonicalization is not defined".into()),
-        Value::String(s)=>{
-            let mut out=String::new();
-            for c in serde_json::to_string(s).map_err(|e|e.to_string())?.chars(){
-                if c.is_ascii(){out.push(c);}else{
-                    let mut buf=[0u16;2];
-                    for unit in c.encode_utf16(&mut buf).iter(){
-                        out.push_str(&format!("\\u{unit:04x}"));
+fn args_parse(args: &[String]) -> Result<Options, String> {
+    let mut o = Options::default();
+    let mut i = 0;
+    while i < args.len() {
+        let arg = args[i].as_str();
+        match arg {
+            "--json" => o.json = true,
+            "--check-guardrails" => o.guardrails = true,
+            "--format" | "--output" | "-o" | "--id" | "--direction" | "--depth" => {
+                i += 1;
+                let value = args
+                    .get(i)
+                    .ok_or_else(|| format!("missing value for {arg}"))?
+                    .clone();
+                match arg {
+                    "--format" => o.format = Some(value),
+                    "--output" | "-o" => o.output = Some(value),
+                    "--id" => o.id = Some(value),
+                    "--direction" => o.direction = Some(value),
+                    "--depth" => {
+                        o.depth = Some(value.parse().map_err(|_| "invalid depth".to_string())?)
                     }
+                    _ => unreachable!(),
                 }
             }
-            Ok(out)
+            "--help" | "-h" => return Err(usage()),
+            _ if arg.starts_with('-') => return Err(format!("unknown option: {arg}")),
+            _ => o.positional.push(arg.to_string()),
         }
-        Value::Array(items)=>Ok(format!("[{}]",items.iter().map(canon)
-            .collect::<Result<Vec<_>,_>>()?.join(","))),
-        Value::Object(items)=>{
-            let pairs=items.iter().map(|(k,v)|
-                Ok(format!("{}:{}",canon(&Value::String(k.clone()))?,canon(v)?)))
-                .collect::<Result<Vec<_>,String>>()?;
-            Ok(format!("{{{}}}",pairs.join(",")))
+        i += 1;
+    }
+    Ok(o)
+}
+fn report(model: &Compiled, as_json: bool) {
+    if as_json {
+        let payload = json!({"valid":model.valid(),"digest":model.digest().ok(),"diagnostics":model.diagnostics});
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&payload).expect("serializable diagnostics")
+        );
+    } else {
+        for d in &model.diagnostics {
+            eprintln!(
+                "{} {} {}: {}",
+                d.severity.to_uppercase(),
+                d.code,
+                d.path,
+                d.message
+            );
+        }
+        if model.valid() {
+            let ir = model.ir.as_ref().expect("validated");
+            println!(
+                "valid  |  {} entities  |  {} relationships  |  sha256:{}",
+                ir["entities"].as_array().map_or(0, Vec::len),
+                ir["relationships"].as_array().map_or(0, Vec::len),
+                model.digest().expect("canonical validation")
+            );
         }
     }
 }
-fn verify(bytes:&[u8])->Result<String,String>{
-    if bytes.len()>4*1024*1024{return Err("AXIR07: input too large".into());}
-    let mut ir:Value=serde_json::from_slice(bytes).map_err(|e|format!("AXIR08: {e}"))?;
-    let claimed=ir.get("sha256").map(|v|v.as_str().ok_or("AXIR09: sha256 must be text"))
-        .transpose()?.map(str::to_owned);
-    ir.as_object_mut().ok_or("AXIR04: expected object")?.remove("sha256");
-    shape(&ir,&["archir_version","namespace","entities","relationships","constraints"])?;
-    if field(&ir,"archir_version")?!="0.1-draft"{return Err("AXIR10: wrong version".into());}
-    let ns=field(&ir,"namespace")?;
-    if ns.len()>64||ns.is_empty()||!ns.chars().next().is_some_and(|c|c.is_ascii_lowercase())
-        ||!ns.chars().all(|c|c.is_ascii_lowercase()||c.is_ascii_digit()||"-_".contains(c)){
-        return Err("AXIR11: invalid namespace".into());
-    }
-    let mut ids=HashSet::new();
-    for entity in list(&ir,"entities",1000)?{
-        shape(entity,&["id","type","name","attributes"])?;
-        let id=field(entity,"id")?;
-        if !ident(id)||!ids.insert(id.to_owned()){return Err("AXIR12: duplicate/invalid ID".into());}
-        if field(entity,"type")?.is_empty()||field(entity,"name")?.is_empty()
-            ||!entity["attributes"].is_object(){return Err("AXIR13: invalid entity".into());}
-    }
-    let mut edges=HashSet::new();
-    for edge in list(&ir,"relationships",4000)?{
-        shape(edge,&["from","relation","to"])?;
-        let a=field(edge,"from")?;let b=field(edge,"to")?;let r=field(edge,"relation")?;
-        if !ids.contains(a)||!ids.contains(b)||r.is_empty(){return Err("AXIR14: invalid edge".into());}
-        if !edges.insert((a.to_owned(),r.to_owned(),b.to_owned())){
-            return Err("AXIR15: duplicate edge".into());
+fn qualified_input(path: &str) -> Result<Compiled, String> {
+    let c = compile_file(Path::new(path));
+    if c.valid() {
+        Ok(c)
+    } else {
+        for d in &c.diagnostics {
+            eprintln!(
+                "{} {} {}: {}",
+                d.severity.to_uppercase(),
+                d.code,
+                d.path,
+                d.message
+            );
         }
-    }
-    let mut rules=HashSet::new();
-    for rule in list(&ir,"constraints",500)?{
-        shape(rule,&["id","select","must","missing_evidence","enforcement"])?;
-        let id=field(rule,"id")?;
-        if !ident(id)||!rules.insert(id.to_owned()){return Err("AXIR16: duplicate/invalid rule".into());}
-        if rule["select"].as_object().is_none_or(|m|m.is_empty())||
-            rule["must"].as_object().is_none_or(|m|m.is_empty()){
-            return Err("AXIR17: empty rule".into());
-        }
-        if !["fail","warn"].contains(&field(rule,"missing_evidence")?)||
-            !["hard","advisory"].contains(&field(rule,"enforcement")?){
-            return Err("AXIR18: invalid rule mode".into());
-        }
-    }
-    let digest=format!("{:x}",Sha256::digest(canon(&ir)?.as_bytes()));
-    if claimed.is_some_and(|v|v!=digest){return Err("AXIR19: digest mismatch".into());}
-    Ok(digest)
-}
-fn main(){
-    let args:Vec<String>=env::args().collect();
-    if args.len()!=3||args[1]!="verify"{
-        eprintln!("usage: arcxiom-ir verify <archir.json>");process::exit(64);
-    }
-    let data=fs::read(&args[2]).unwrap_or_else(|e|{
-        eprintln!("AXIR20: {e}");process::exit(2)
-    });
-    match verify(&data){
-        Ok(hash)=>println!("sha256:{hash}"),
-        Err(err)=>{eprintln!("{err}");process::exit(2);}
+        Err(format!("AXS999: rejected architecture source: {path}"))
     }
 }
-#[cfg(test)]
-mod tests{
-    use super::*;
-    #[test]
-    fn unicode_matches_python(){
-        assert_eq!(canon(&serde_json::json!({"x":"é😀"})).unwrap(),
-            "{\"x\":\"\\u00e9\\ud83d\\ude00\"}");
+fn main_run(args: &[String]) -> Result<i32, (i32, String)> {
+    if args.is_empty() {
+        return Err((64, usage()));
     }
-    #[test]
-    fn forged_digest_rejected(){
-        let bad=br#"{"archir_version":"0.1-draft","namespace":"x","entities":[],"relationships":[],"constraints":[],"sha256":"bad"}"#;
-        assert!(verify(bad).unwrap_err().contains("AXIR19"));
+    if args[0] == "--version" || args[0] == "-V" {
+        println!(
+            "arcxiom {} | ArchIR {}",
+            env!("CARGO_PKG_VERSION"),
+            arcxiom_ir::VERSION
+        );
+        return Ok(0);
     }
-    #[test]
-    fn missing_endpoint_rejected(){
-        let bad=br#"{"archir_version":"0.1-draft","namespace":"x","entities":[],"relationships":[{"from":"x","relation":"supports","to":"y"}],"constraints":[]}"#;
-        assert!(verify(bad).unwrap_err().contains("AXIR14"));
+    if args[0] == "--help" || args[0] == "-h" {
+        println!("{}", usage());
+        return Ok(0);
+    }
+    let opts = args_parse(&args[1..]).map_err(|e| (64, e))?;
+    // Never accept an option whose requested behavior is ignored. Automation
+    // must not observe success for a command it did not actually perform.
+    let unsupported = match args[0].as_str() {
+        "validate" => {
+            opts.format.is_some()
+                || opts.output.is_some()
+                || opts.id.is_some()
+                || opts.direction.is_some()
+                || opts.depth.is_some()
+                || opts.guardrails
+        }
+        "export" => {
+            opts.json
+                || opts.id.is_some()
+                || opts.direction.is_some()
+                || opts.depth.is_some()
+                || opts.guardrails
+        }
+        "query" => opts.format.is_some() || opts.output.is_some() || opts.guardrails,
+        "diff" => {
+            opts.format.is_some()
+                || opts.output.is_some()
+                || opts.id.is_some()
+                || opts.direction.is_some()
+                || opts.depth.is_some()
+        }
+        "verify" => {
+            opts.json
+                || opts.format.is_some()
+                || opts.output.is_some()
+                || opts.id.is_some()
+                || opts.direction.is_some()
+                || opts.depth.is_some()
+                || opts.guardrails
+        }
+        _ => false,
+    };
+    if unsupported {
+        return Err((64, "AXCLI001: unsupported option for subcommand".into()));
+    }
+    match args[0].as_str() {
+        "validate" => {
+            if opts.positional.len() != 1 {
+                return Err((64, usage()));
+            }
+            let model = compile_file(Path::new(&opts.positional[0]));
+            report(&model, opts.json);
+            Ok(if model.valid() { 0 } else { 2 })
+        }
+        "export" => {
+            if opts.positional.len() != 1
+                || opts.json
+                || opts.format.as_deref().is_some_and(|f| f != "json")
+            {
+                return Err((64, usage()));
+            }
+            let c = qualified_input(&opts.positional[0]).map_err(|e| (2, e))?;
+            let payload = export(c.ir.as_ref().expect("validated")).map_err(|e| (2, e))?;
+            if let Some(path) = opts.output {
+                let target = Path::new(&path);
+                if target.is_symlink()
+                    || target
+                        .parent()
+                        .is_some_and(|p| !p.as_os_str().is_empty() && !p.is_dir())
+                {
+                    return Err((2, "AXO001: symlink or missing output directory".into()));
+                }
+                fs::write(target, payload.as_bytes()).map_err(|e| (2, format!("AXO002: {e}")))?;
+                println!("{path}");
+            } else {
+                print!("{payload}");
+            }
+            Ok(0)
+        }
+        "query" => {
+            if opts.positional.len() != 1 || opts.id.is_none() {
+                return Err((64, usage()));
+            }
+            let c = qualified_input(&opts.positional[0]).map_err(|e| (2, e))?;
+            let start = opts.id.as_deref().expect("checked id");
+            let direction = opts.direction.as_deref().unwrap_or("outgoing");
+            let depth = opts.depth.unwrap_or(3);
+            let result = query(c.ir.as_ref().expect("validated"), start, direction, depth)
+                .map_err(|e| (2, e))?;
+            if opts.json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&result).expect("serializable query")
+                );
+            } else {
+                for node in result["nodes"].as_array().expect("typed query") {
+                    println!(
+                        "{}  {:<20} {}",
+                        node["distance"],
+                        node["type"].as_str().unwrap_or(""),
+                        node["id"].as_str().unwrap_or("")
+                    );
+                }
+            }
+            Ok(0)
+        }
+        "diff" => {
+            if opts.positional.len() != 2 {
+                return Err((64, usage()));
+            }
+            let before = qualified_input(&opts.positional[0]).map_err(|e| (2, e))?;
+            let after = qualified_input(&opts.positional[1]).map_err(|e| (2, e))?;
+            let a = before.ir.as_ref().expect("validated");
+            let b = after.ir.as_ref().expect("validated");
+            let mut delta = diff(a, b).map_err(|e| (2, e))?;
+            let violations = if opts.guardrails {
+                guardrail_delta(a, b)
+            } else {
+                vec![]
+            };
+            delta["guardrail_violations"] = json!(violations);
+            if opts.json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&delta).expect("serializable diff")
+                );
+            } else {
+                for change in delta["changes"].as_array().expect("typed diff") {
+                    println!(
+                        "{}  {:<9} {}",
+                        change["section"].as_str().unwrap_or(""),
+                        change["action"].as_str().unwrap_or(""),
+                        change["id"].as_str().unwrap_or("")
+                    );
+                }
+                if delta["changed"] == false {
+                    println!("no semantic changes");
+                }
+                for v in &violations {
+                    eprintln!("ERROR {} {}: {}", v["code"], v["object_id"], v["message"]);
+                }
+            }
+            Ok(if !violations.is_empty() {
+                2
+            } else if delta["changed"] == true {
+                3
+            } else {
+                0
+            })
+        }
+        "verify" => {
+            if opts.positional.len() != 1 {
+                return Err((64, usage()));
+            }
+            let verify_path = Path::new(&opts.positional[0]);
+            let metadata =
+                fs::symlink_metadata(verify_path).map_err(|e| (2, format!("AXIR20: {e}")))?;
+            if !metadata.file_type().is_file() {
+                return Err((
+                    2,
+                    "AXIR20: verification input must be a regular file".into(),
+                ));
+            }
+            let file = fs::File::open(verify_path).map_err(|e| (2, format!("AXIR20: {e}")))?;
+            if !file.metadata().is_ok_and(|m| m.is_file()) {
+                return Err((
+                    2,
+                    "AXIR20: opened verification input is not a regular file".into(),
+                ));
+            }
+            let mut data = Vec::new();
+            file.take((4 * MAX_BYTES + 1) as u64)
+                .read_to_end(&mut data)
+                .map_err(|e| (2, format!("AXIR20: {e}")))?;
+            let hash = verify_json(&data).map_err(|e| (2, e))?;
+            println!("sha256:{hash}");
+            Ok(0)
+        }
+        _ => Err((64, usage())),
+    }
+}
+fn main() {
+    let args: Vec<String> = env::args().skip(1).collect();
+    match main_run(&args) {
+        Ok(code) => process::exit(code),
+        Err((code, message)) => {
+            eprintln!("{message}");
+            process::exit(code);
+        }
     }
 }
