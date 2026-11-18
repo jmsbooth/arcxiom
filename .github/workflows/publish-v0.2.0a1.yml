@@ -1,0 +1,147 @@
+name: Prepare v0.2.0a1 release draft (manual only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      approved_commit:
+        description: Exact reviewed main commit SHA
+        required: true
+        type: string
+      acknowledge:
+        description: Type v0.2.0a1 to confirm draft release preparation
+        required: true
+        type: string
+permissions:
+  contents: read
+
+concurrency:
+  group: arcxiom-release-v0.2.0a1
+  cancel-in-progress: false
+
+jobs:
+  verify-approval:
+    name: Human initiation and exact commit gate
+    if: github.repository == 'jmsbooth/arcxiom' && github.actor == 'jmsbooth' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject incorrect commit or typed approval
+        env:
+          EXPECTED: ${{ inputs.approved_commit }}
+          CONFIRMATION: ${{ inputs.acknowledge }}
+        run: |
+          test "$CONFIRMATION" = 'v0.2.0a1'
+          test "$EXPECTED" = "$GITHUB_SHA"
+          test "\${#EXPECTED}" -eq 40
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Validate exact commit and frozen release contract
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python - <<'PY'
+          import pathlib,tomllib
+          manifest=tomllib.loads(pathlib.Path('rust/arcxiom-ir/Cargo.toml').read_text())
+          assert manifest['package']['version']=='0.2.0-alpha.1'
+          assert pathlib.Path('docs/releases/v0.2.0a1.md').is_file()
+          assert pathlib.Path('rust/arcxiom-ir/Cargo.lock').is_file()
+          PY
+  build:
+    name: Exact-source matrix artifact / ${{ matrix.os }}
+    needs: verify-approval
+    if: needs.verify-approval.result == 'success'
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.85.0'
+          components: rustfmt, clippy
+      - name: Recheck qualification with pinned dependencies
+        shell: bash
+        run: |
+          cargo fmt --manifest-path rust/arcxiom-ir/Cargo.toml -- --check
+          cargo clippy --locked --manifest-path rust/arcxiom-ir/Cargo.toml --all-targets -- -D warnings
+          cargo test --locked --manifest-path rust/arcxiom-ir/Cargo.toml --all-targets
+          cargo build --locked --release --manifest-path rust/arcxiom-ir/Cargo.toml
+      - name: Package portable CLI and checksums
+        shell: bash
+        run: |
+          mkdir -p dist
+          python - <<'PY'
+          import hashlib,os,pathlib,platform,zipfile
+          ext='.exe' if platform.system()=='Windows' else ''
+          binary=pathlib.Path('rust/arcxiom-ir/target/release')/('arcxiom'+ext)
+          system=platform.system().lower()
+          arch=platform.machine().lower()
+          name=f'arcxiom-v0.2.0a1-{system}-{arch}.zip'
+          out=pathlib.Path('dist')/name
+          with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED) as z:
+              info=zipfile.ZipInfo('arcxiom'+ext)
+              info.create_system=3
+              info.external_attr=(0o100755<<16)
+              info.compress_type=zipfile.ZIP_DEFLATED
+              z.writestr(info,binary.read_bytes())
+              for src in ('LICENSE','spec/archyaml-v0.1-compat.md','docs/releases/v0.2.0a1.md'):
+                  z.write(src,src)
+          digest=hashlib.sha256(out.read_bytes()).hexdigest()
+          (pathlib.Path('dist')/('SHA256SUMS.'+system)).write_text(f'{digest}  {name}\n')
+          assert hashlib.sha256(out.read_bytes()).hexdigest()==digest
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: arcxiom-${{ runner.os }}
+          path: dist/
+          if-no-files-found: error
+  create-draft:
+    name: Stage unpublished draft; maintainer must explicitly publish
+    needs: build
+    if: needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    environment: arcxiom-release
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: v0.2.0a1
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Download exact-run artifacts
+        shell: bash
+        run: |
+          mkdir -p dist
+          for os in Linux macOS Windows; do
+            gh run download "$GITHUB_RUN_ID" -n "arcxiom-$os" -D dist
+          done
+      - name: Verify all checksums and no immutable version collision
+        shell: bash
+        run: |
+          cd dist
+          cat SHA256SUMS.* > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          test "$(find . -maxdepth 1 -name 'arcxiom-*.zip' | wc -l)" -eq 3
+          cd ..
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already exists; refuse mutation" >&2
+            exit 1
+          fi
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+            echo "Tag already exists; refuse to move immutable ref" >&2
+            exit 1
+          fi
+      - name: Create prerelease draft only; never publish automatically
+        shell: bash
+        run: |
+          gh release create "$TAG" dist/arcxiom-*.zip dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title 'Arcxiom v0.2.0a1 - experimental Rust kernel alpha' \
+            --notes-file docs/releases/v0.2.0a1.md \
+            --prerelease \
+            --draft \
+            --latest=false
