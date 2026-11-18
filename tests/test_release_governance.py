@@ -141,3 +141,16 @@ def test_external_github_actions_are_full_sha_pinned():
                 assert re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", action), (
                     f"Unpinned action {action} in {path}"
                 )
+
+
+def test_public_pull_request_workflows_are_read_only_and_never_target_privileged_context():
+    for path in (KERNEL, PYTHON, WHEEL):
+        workflow = _workflow(path)
+        assert "pull_request" in workflow["on"]
+        assert "pull_request_target" not in workflow["on"]
+        assert workflow["permissions"] == {"contents": "read"}
+        for job in workflow["jobs"].values():
+            perms = job.get("permissions", {})
+            assert all(value != "write" for value in perms.values()), (
+                f"Untrusted PR job has write privileges: {path}"
+            )
