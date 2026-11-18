@@ -437,7 +437,10 @@ fn source_loader_rejects_nonregular_directory_and_fifo() {
     let dir = std::env::temp_dir().canonicalize().unwrap();
     assert_eq!(arcxiom_ir::compile_file(&dir).diagnostics[0].code, "AXY012");
     let fifo = dir.join(format!("arcxiom-fifo-{}.arch.yaml", std::process::id()));
-    let result = std::process::Command::new("mkfifo").arg(&fifo).status().unwrap();
+    let result = std::process::Command::new("mkfifo")
+        .arg(&fifo)
+        .status()
+        .unwrap();
     assert!(result.success());
     let model = arcxiom_ir::compile_file(&fifo);
     let _ = std::fs::remove_file(&fifo);
