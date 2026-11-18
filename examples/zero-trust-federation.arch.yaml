@@ -1,0 +1,65 @@
+# Original cross-domain conformance example for v0.2.0a1.
+version: "0.1-draft"
+namespace: zero-trust-federation
+entities:
+  - id: mission.share-intelligence
+    type: mission
+    name: Share protected intelligence
+  - id: capability.secure-exchange
+    type: capability
+    name: Controlled exchange
+  - id: role.data-steward
+    type: role
+    name: Data steward
+  - id: system.federation
+    type: system_of_systems
+    name: Federated mission network
+  - id: service.policy-gateway
+    type: service
+    name: Policy-aware gateway
+  - id: hardware.edge-node
+    type: hardware
+    name: Edge node
+  - id: data.mission-report
+    type: data_asset
+    name: Mission report
+    classification: restricted
+  - id: flow.telemetry
+    type: data_flow
+    name: Edge telemetry submission
+    source: hardware.edge-node
+    destination: service.policy-gateway
+    carries: [data.mission-report]
+    transport_encrypted: true
+    max_lag_ms: 250
+relationships:
+  - from: system.federation
+    relation: realizes
+    to: capability.secure-exchange
+  - from: capability.secure-exchange
+    relation: supports
+    to: mission.share-intelligence
+  - from: service.policy-gateway
+    relation: implements
+    to: system.federation
+  - from: role.data-steward
+    relation: operates
+    to: hardware.edge-node
+  - from: hardware.edge-node
+    relation: flows_to
+    to: flow.telemetry
+  - from: flow.telemetry
+    relation: flows_to
+    to: service.policy-gateway
+  - from: flow.telemetry
+    relation: carries
+    to: data.mission-report
+constraints:
+  - id: security.in-transit
+    enforcement: hard
+    missing_evidence: fail
+    select:
+      type: data_flow
+      carries_classification: restricted
+    must:
+      transport_encrypted: true
