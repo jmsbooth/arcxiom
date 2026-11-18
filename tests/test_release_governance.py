@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -127,3 +128,16 @@ def test_actual_approval_shell_rejects_wrong_commit_acknowledgement_and_length()
         assert (completed.returncode == 0) == (expected_success == 0), (
             actual, expected, confirmation, completed.stderr
         )
+
+
+def test_external_github_actions_are_full_sha_pinned():
+    for path in (WORKFLOW, KERNEL, PYTHON, WHEEL):
+        workflow = _workflow(path)
+        for job in workflow["jobs"].values():
+            for step in job.get("steps", []):
+                action = step.get("uses")
+                if not action or action.startswith("./"):
+                    continue
+                assert re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", action), (
+                    f"Unpinned action {action} in {path}"
+                )
