@@ -72,6 +72,22 @@ jobs:
           "$EXE" query examples/zero-trust-federation.arch.yaml --id role.data-steward --depth 8 --json > rust-federation-query.json
           "$EXE" diff examples/emergency-response.arch.yaml examples/emergency-response.arch.yaml --json > rust-diff.json
           python -c 'import json; from pathlib import Path; j=lambda p:json.loads(Path(p).read_text()); assert j("python-archir.json")==j("rust-archir.json"); assert j("python-federation.json")==j("rust-federation.json"); assert j("python-query.json")==j("rust-query.json"); assert j("python-federation-query.json")==j("rust-federation-query.json"); assert j("python-diff.json")==j("rust-diff.json")'
+      - name: Verify release governance and execute approval negative tests
+        shell: bash
+        run: |
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          source=Path('tests/test_release_governance.py')
+          spec=importlib.util.spec_from_file_location('release_policy_tests',source)
+          module=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          tests=[name for name in dir(module) if name.startswith('test_')]
+          assert len(tests)>=5, f'expected at least 5 release controls, got {tests}'
+          for name in tests:
+              getattr(module,name)()
+          print(f'{len(tests)} release governance controls passed')
+          PY
       - name: Stage installable release-candidate binary with checksum and dependency inventory
         shell: bash
         run: |
