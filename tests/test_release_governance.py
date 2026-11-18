@@ -1,5 +1,7 @@
 """Contract tests for GitHub release governance; do not claim to enforce settings."""
 
+import copy
+import importlib.util
 import json
 import os
 import re
@@ -154,3 +156,67 @@ def test_public_pull_request_workflows_are_read_only_and_never_target_privileged
             assert all(value != "write" for value in perms.values()), (
                 f"Untrusted PR job has write privileges: {path}"
             )
+
+
+def test_release_checks_exact_sha_pr_provenance_and_trusted_check_run_results():
+    source = ROOT / "scripts/verify_release_qualification.py"
+    spec = importlib.util.spec_from_file_location("verify_release_qualification", source)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    sha = "a" * 40
+    policy = json.loads(PROTECTION.read_text(encoding="utf-8"))
+    branch = {"name": "main", "protected": True, "commit": {"sha": sha}}
+    pulls = [{"merged_at": "2026-11-18T12:00:00Z", "merge_commit_sha": sha,
+              "base": {"ref": "main"}}]
+    checks = [
+        {"id": n, "name": name, "app": {"id": module.ACTIONS_APP_ID},
+         "head_sha": sha, "status": "completed", "conclusion": "success"}
+        for n, name in enumerate(sorted(module.EXPECTED_CHECKS), 1)
+    ]
+    assert len(checks) == 11
+    module.qualify(sha, branch, policy, checks, pulls)
+
+    def rejects(b=branch, p=policy, c=checks, prs=pulls, commit=sha):
+        try:
+            module.qualify(commit, b, p, c, prs)
+        except ValueError as exc:
+            assert str(exc).startswith("AXREL001:")
+        else:
+            raise AssertionError("unsafe release source was accepted")
+
+    rejects(b={**branch, "protected": False})
+    rejects(b={**branch, "commit": {"sha": "b" * 40}})
+    rejects(p={**policy, "enforce_admins": False})
+    rejects(p={**policy, "required_pull_request_reviews": None})
+    rejects(p={**policy, "required_status_checks": {"strict": True, "contexts": ["wheel-smoke"]}})
+    rejects(prs=[])
+    rejects(prs=[{**pulls[0], "merged_at": None}])
+    rejects(prs=[{**pulls[0], "merge_commit_sha": "b" * 40}])
+    rejects(c=checks[:-1])
+    wrong_app = copy.deepcopy(checks)
+    wrong_app[0]["app"]["id"] = 12345
+    rejects(c=wrong_app)
+    wrong_sha = copy.deepcopy(checks)
+    wrong_sha[0]["head_sha"] = "b" * 40
+    rejects(c=wrong_sha)
+    failed_latest = copy.deepcopy(checks)
+    failed_latest.append({**checks[0], "id": 1000, "conclusion": "failure"})
+    rejects(c=failed_latest)
+    running_latest = copy.deepcopy(checks)
+    running_latest.append({**checks[0], "id": 1001, "conclusion": None, "status": "in_progress"})
+    rejects(c=running_latest)
+    rejects(commit="not-a-full-sha")
+
+
+def test_manual_release_requires_read_only_checks_and_pr_provenance():
+    workflow = _workflow(WORKFLOW)
+    gate = workflow["jobs"]["verify-approval"]
+    assert gate["permissions"] == {
+        "contents": "read", "checks": "read", "pull-requests": "read"
+    }
+    code = "\n".join(step.get("run", "") for step in gate["steps"])
+    assert "scripts/verify_release_qualification.py" in code
+    assert "commits/$GITHUB_SHA/check-runs" in code
+    assert "commits/$GITHUB_SHA/pulls" in code
+    assert "--policy .github/main-protection.json" in code
