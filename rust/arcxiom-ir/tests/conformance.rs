@@ -430,3 +430,16 @@ fn verifier_requires_claimed_sha256_not_just_semantically_valid_json() {
     let err = verify_json(&serde_json::to_vec(&exported).unwrap()).unwrap_err();
     assert!(err.contains("AXIR19"), "{err}");
 }
+
+#[cfg(unix)]
+#[test]
+fn source_loader_rejects_nonregular_directory_and_fifo() {
+    let dir = std::env::temp_dir().canonicalize().unwrap();
+    assert_eq!(arcxiom_ir::compile_file(&dir).diagnostics[0].code, "AXY012");
+    let fifo = dir.join(format!("arcxiom-fifo-{}.arch.yaml", std::process::id()));
+    let result = std::process::Command::new("mkfifo").arg(&fifo).status().unwrap();
+    assert!(result.success());
+    let model = arcxiom_ir::compile_file(&fifo);
+    let _ = std::fs::remove_file(&fifo);
+    assert_eq!(model.diagnostics[0].code, "AXY012");
+}
