@@ -161,3 +161,31 @@ fn verify_rejects_directory_without_blocking() {
     assert!(String::from_utf8_lossy(&status.stderr).contains("AXIR20"));
     let _ = fs::remove_dir(dir);
 }
+
+#[test]
+fn unsupported_subcommand_options_fail_without_side_effects() {
+    let example = published();
+    let dir = test_dir("unsupported-options");
+    let output = dir.join("should-not-exist.json");
+    let target = output.to_str().unwrap();
+    let cases: &[&[&str]] = &[
+        &["validate", &example, "--output", target],
+        &["validate", &example, "--check-guardrails"],
+        &["export", &example, "--id", "role.dispatcher"],
+        &["export", &example, "--json"],
+        &["query", &example, "--id", "role.dispatcher", "--check-guardrails"],
+        &["query", &example, "--id", "role.dispatcher", "--output", target],
+        &["diff", &example, &example, "--depth", "2"],
+        &["diff", &example, &example, "--output", target],
+        &["verify", &example, "--json"],
+        &["verify", &example, "--format", "json"],
+    ];
+    for args in cases {
+        let result = command(args);
+        assert_eq!(result.status.code(), Some(64), "accepted unsupported option: {args:?}; {result:?}");
+        assert!(result.stdout.is_empty(), "unexpected output for {args:?}");
+        assert!(String::from_utf8_lossy(&result.stderr).contains("AXCLI001"));
+    }
+    assert!(!output.exists(), "invalid command created an output file");
+    let _ = fs::remove_dir(dir);
+}
