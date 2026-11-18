@@ -375,3 +375,31 @@ fn verifying_a_self_hashed_but_semantically_invalid_ir_fails_closed() {
         .unwrap_err()
         .contains("AXIR21"));
 }
+
+#[test]
+fn required_entities_field_and_all_block_scalar_variants_are_rejected() {
+    error("version: 0.1-draft\nnamespace: required\n", "AXS004");
+    for block in ["|", "|+", "|-", "|2", "|2-", ">+", ">1", ">-"] {
+        let source = format!(
+            "version: 0.1-draft\nnamespace: required\nentities:\n  - id: role.x\n    type: role\n    notes: {block}\n      unsafe text\n"
+        );
+        error(&source, "AXY001");
+    }
+}
+#[test]
+fn ambiguous_numeric_spellings_must_not_be_coerced() {
+    for spelling in ["0x10", "0o10", "0b10", "007", "+00", "1_000"] {
+        let source = format!(
+            "version: 0.1-draft\nnamespace: numeric\nentities:\n  - id: role.x\n    type: role\n    probe: {spelling}\n"
+        );
+        let compiled = compile_str(&source);
+        if compiled.valid() {
+            let actual = &compiled.ir.as_ref().unwrap()["entities"][0]["attributes"]["probe"];
+            assert_eq!(
+                actual,
+                &serde_json::Value::String(spelling.to_owned()),
+                "ambiguous numeric spelling was converted: {spelling}"
+            );
+        }
+    }
+}
