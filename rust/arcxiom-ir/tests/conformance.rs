@@ -96,7 +96,7 @@ fn data_flow_references_are_typed() {
 }
 #[test]
 fn security_constraint_is_fail_closed() {
-    let published = published.replace("\r\n", "\n");
+    let published = PUBLISHED.replace("\r\n", "\n");
     let baseline = valid(&published);
     let unencrypted = published.replace(
         "    transport_encrypted: true\nrelationships:",
