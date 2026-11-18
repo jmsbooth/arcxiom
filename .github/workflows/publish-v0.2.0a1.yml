@@ -74,29 +74,19 @@ jobs:
           cargo clippy --locked --manifest-path rust/arcxiom-ir/Cargo.toml --all-targets -- -D warnings
           cargo test --locked --manifest-path rust/arcxiom-ir/Cargo.toml --all-targets
           cargo build --locked --release --manifest-path rust/arcxiom-ir/Cargo.toml
-      - name: Package portable CLI and checksums
+      - name: Package portable CLI and checksums using qualified shared code
         shell: bash
         run: |
-          mkdir -p dist
+          python scripts/package_release.py --output dist
           python - <<'PY'
-          import hashlib,os,pathlib,platform,zipfile
-          ext='.exe' if platform.system()=='Windows' else ''
-          binary=pathlib.Path('rust/arcxiom-ir/target/release')/('arcxiom'+ext)
-          system=platform.system().lower()
-          arch=platform.machine().lower()
-          name=f'arcxiom-v0.2.0a1-{system}-{arch}.zip'
-          out=pathlib.Path('dist')/name
-          with zipfile.ZipFile(out,'w',compression=zipfile.ZIP_DEFLATED) as z:
-              info=zipfile.ZipInfo('arcxiom'+ext)
-              info.create_system=3
-              info.external_attr=(0o100755<<16)
-              info.compress_type=zipfile.ZIP_DEFLATED
-              z.writestr(info,binary.read_bytes())
-              for src in ('LICENSE','spec/archyaml-v0.1-compat.md','docs/releases/v0.2.0a1.md'):
-                  z.write(src,src)
-          digest=hashlib.sha256(out.read_bytes()).hexdigest()
-          (pathlib.Path('dist')/('SHA256SUMS.'+system)).write_text(f'{digest}  {name}\n')
-          assert hashlib.sha256(out.read_bytes()).hexdigest()==digest
+          import pathlib,hashlib
+          out=pathlib.Path("dist")
+          archives=list(out.glob("arcxiom-v0.2.0a1-*.zip"))
+          checks=list(out.glob("SHA256SUMS.*"))
+          assert len(archives)==len(checks)==1
+          claim, name=checks[0].read_text().strip().split()
+          assert name==archives[0].name
+          assert claim==hashlib.sha256(archives[0].read_bytes()).hexdigest()
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
