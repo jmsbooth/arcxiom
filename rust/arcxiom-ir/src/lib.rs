@@ -357,7 +357,7 @@ pub fn compile_str(src: &str) -> Compiled {
     if let Err(d) = preflight(src) {
         return fail(d);
     }
-    let raw = match serde_yaml::from_str::<Strict>(src) {
+    let raw = match serde_saphyr::from_str::<Strict>(src) {
         Ok(v) => v.0,
         Err(e) => {
             let msg = e.to_string();
