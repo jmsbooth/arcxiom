@@ -121,6 +121,46 @@ fn main_run(args: &[String]) -> Result<i32, (i32, String)> {
         return Ok(0);
     }
     let opts = args_parse(&args[1..]).map_err(|e| (64, e))?;
+    // Never accept an option whose requested behavior is ignored. Automation
+    // must not observe success for a command it did not actually perform.
+    let unsupported = match args[0].as_str() {
+        "validate" => {
+            opts.format.is_some()
+                || opts.output.is_some()
+                || opts.id.is_some()
+                || opts.direction.is_some()
+                || opts.depth.is_some()
+                || opts.guardrails
+        }
+        "export" => {
+            opts.json
+                || opts.id.is_some()
+                || opts.direction.is_some()
+                || opts.depth.is_some()
+                || opts.guardrails
+        }
+        "query" => opts.format.is_some() || opts.output.is_some() || opts.guardrails,
+        "diff" => {
+            opts.format.is_some()
+                || opts.output.is_some()
+                || opts.id.is_some()
+                || opts.direction.is_some()
+                || opts.depth.is_some()
+        }
+        "verify" => {
+            opts.json
+                || opts.format.is_some()
+                || opts.output.is_some()
+                || opts.id.is_some()
+                || opts.direction.is_some()
+                || opts.depth.is_some()
+                || opts.guardrails
+        }
+        _ => false,
+    };
+    if unsupported {
+        return Err((64, "AXCLI001: unsupported option for subcommand".into()));
+    }
     match args[0].as_str() {
         "validate" => {
             if opts.positional.len() != 1 {
