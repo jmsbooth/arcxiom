@@ -357,7 +357,17 @@ pub fn compile_str(src: &str) -> Compiled {
     if let Err(d) = preflight(src) {
         return fail(d);
     }
-    let raw = match serde_saphyr::from_str::<Strict>(src) {
+    // Exact safe-Rust parser behavior is part of the 0.1-draft compatibility profile.
+    // Do not expand YAML merges or collapse duplicate keys before our visitor can
+    // reject them. Preserve ambiguous numeric spellings rather than coercing them.
+    let parser_options = serde_saphyr::options! {
+        duplicate_keys: serde_saphyr::DuplicateKeyPolicy::PassThrough,
+        merge_keys: serde_saphyr::MergeKeyPolicy::Error,
+        strict_booleans: true,
+        leading_zero_numbers_as_strings: true,
+        underscored_numbers_as_strings: true,
+    };
+    let raw = match serde_saphyr::from_str_with_options::<Strict>(src, parser_options) {
         Ok(v) => v.0,
         Err(e) => {
             let msg = e.to_string();
