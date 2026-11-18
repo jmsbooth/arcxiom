@@ -31,7 +31,7 @@ jobs:
         run: |
           test "$CONFIRMATION" = 'v0.2.0a1'
           test "$EXPECTED" = "$GITHUB_SHA"
-          test "\${#EXPECTED}" -eq 40
+          test "${#EXPECTED}" -eq 40
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Validate exact commit and frozen release contract
         shell: bash
