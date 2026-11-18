@@ -493,6 +493,25 @@ pub fn compile_file(path: &Path) -> Compiled {
             ));
         }
     }
+    // Reject pipes, devices and directories *before* open: a FIFO could block
+    // indefinitely at File::open, before our bounded read ever begins.
+    match fs::symlink_metadata(path) {
+        Ok(meta) if meta.file_type().is_file() => {}
+        Ok(_) => {
+            return fail(Diagnostic::error(
+                "AXY012",
+                "source path must be a regular file",
+                path.display().to_string(),
+            ));
+        }
+        Err(e) => {
+            return fail(Diagnostic::error(
+                "AXY012",
+                format!("cannot stat source: {e}"),
+                path.display().to_string(),
+            ));
+        }
+    }
     // Never read an untrusted file without a cap: fs::read would allocate the
     // entire file before our limit check, enabling a memory-exhaustion input.
     let file = match fs::File::open(path) {
@@ -505,6 +524,13 @@ pub fn compile_file(path: &Path) -> Compiled {
             ))
         }
     };
+    if !file.metadata().is_ok_and(|m| m.is_file()) {
+        return fail(Diagnostic::error(
+            "AXY012",
+            "opened source is not a regular file",
+            path.display().to_string(),
+        ));
+    }
     let mut data = Vec::new();
     if let Err(e) = file.take((MAX_BYTES + 1) as u64).read_to_end(&mut data) {
         return fail(Diagnostic::error(
