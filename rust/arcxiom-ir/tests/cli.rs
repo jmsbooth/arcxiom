@@ -15,8 +15,8 @@ fn published() -> String {
         .display()
         .to_string()
 }
-fn test_dir() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("arcxiom-cli-e2e-{}", std::process::id()));
+fn test_dir(test_name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("arcxiom-cli-e2e-{}-{test_name}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -27,7 +27,8 @@ fn source_to_export_to_verify_to_query_pipeline() {
     assert_eq!(result.status.code(), Some(0), "{result:?}");
     let report: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
     assert_eq!(report["valid"], true);
-    let output = test_dir().join("model.json");
+    let dir = test_dir("source-export-query");
+    let output = dir.join("model.json");
     let filename = output.to_str().unwrap();
     let export = command(&["export", &example, "--output", filename]);
     assert_eq!(export.status.code(), Some(0), "{export:?}");
@@ -53,13 +54,13 @@ fn source_to_export_to_verify_to_query_pipeline() {
         .iter()
         .any(|x| x["id"] == "mission.coordinate-response"));
     let _ = fs::remove_file(output);
-    let _ = fs::remove_dir(test_dir());
+    let _ = fs::remove_dir(dir);
 }
 #[test]
 fn diff_exit_codes_and_baseline_guards() {
     let example = published();
     let original = fs::read_to_string(&example).unwrap();
-    let dir = test_dir();
+    let dir = test_dir("diff-guardrails");
     let candidate = dir.join("candidate.arch.yaml");
     let unchanged = command(&["diff", &example, &example, "--json"]);
     assert_eq!(unchanged.status.code(), Some(0));
@@ -90,7 +91,7 @@ fn diff_exit_codes_and_baseline_guards() {
 }
 #[test]
 fn invalid_source_and_argument_exit_contract() {
-    let dir = test_dir();
+    let dir = test_dir("invalid-source");
     let bad = dir.join("invalid.arch.yaml");
     fs::write(
         &bad,
