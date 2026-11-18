@@ -342,10 +342,10 @@ fn preflight(src: &str) -> Result<(), Diagnostic> {
         let indicator = line.rsplit_once(':').map(|(_, scalar)| scalar.trim());
         let is_block_scalar = indicator.is_some_and(|scalar| {
             let bytes = scalar.as_bytes();
-            matches!(bytes.first(), Some(b'|' | b'>'))
+            bytes.first().is_some_and(|b| *b == b'|' || *b == b'>')
                 && bytes[1..]
                     .iter()
-                    .all(|c| matches!(c, b'+' | b'-' | b'0'..=b'9'))
+                    .all(|c| matches!(*c, b'+' | b'-' | b'0'..=b'9'))
         });
         if is_block_scalar {
             return Err(Diagnostic::error(
