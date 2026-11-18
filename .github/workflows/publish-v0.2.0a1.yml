@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: '1.85.0'
+          toolchain: '1.89.0'
           components: rustfmt, clippy
       - name: Recheck qualification with pinned dependencies
         shell: bash
