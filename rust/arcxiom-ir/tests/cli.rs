@@ -16,10 +16,13 @@ fn published() -> String {
         .to_string()
 }
 fn test_dir(test_name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().canonicalize().expect("resolve system temp root").join(format!(
-        "arcxiom-cli-e2e-{}-{test_name}",
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir()
+        .canonicalize()
+        .expect("resolve system temp root")
+        .join(format!(
+            "arcxiom-cli-e2e-{}-{test_name}",
+            std::process::id()
+        ));
     fs::create_dir_all(&dir).unwrap();
     dir
 }
