@@ -295,11 +295,14 @@ fn canonical_unicode_and_limits() {
 }
 #[test]
 fn source_file_read_and_utf8() {
-    let temp = std::env::temp_dir().canonicalize().expect("resolve system temp root").join(format!(
-        "arcxiom-{}-{}.arch.yaml",
-        std::process::id(),
-        "utf8"
-    ));
+    let temp = std::env::temp_dir()
+        .canonicalize()
+        .expect("resolve system temp root")
+        .join(format!(
+            "arcxiom-{}-{}.arch.yaml",
+            std::process::id(),
+            "utf8"
+        ));
     std::fs::write(&temp, b"\xff\xfe").unwrap();
     let model = arcxiom_ir::compile_file(&temp);
     let _ = std::fs::remove_file(&temp);
@@ -309,8 +312,14 @@ fn source_file_read_and_utf8() {
 #[test]
 fn symlink_components_are_rejected() {
     use std::os::unix::fs::symlink;
-    let dest = std::env::temp_dir().canonicalize().expect("resolve system temp root").join(format!("arcxiom-real-{}.arch.yaml", std::process::id()));
-    let link = std::env::temp_dir().canonicalize().expect("resolve system temp root").join(format!("arcxiom-link-{}.arch.yaml", std::process::id()));
+    let dest = std::env::temp_dir()
+        .canonicalize()
+        .expect("resolve system temp root")
+        .join(format!("arcxiom-real-{}.arch.yaml", std::process::id()));
+    let link = std::env::temp_dir()
+        .canonicalize()
+        .expect("resolve system temp root")
+        .join(format!("arcxiom-link-{}.arch.yaml", std::process::id()));
     std::fs::write(&dest, PUBLISHED).unwrap();
     symlink(&dest, &link).unwrap();
     let result = arcxiom_ir::compile_file(&link);
