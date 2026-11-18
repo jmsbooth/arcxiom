@@ -139,7 +139,9 @@ fn main_run(args: &[String]) -> Result<i32, (i32, String)> {
             let payload = export(c.ir.as_ref().expect("validated")).map_err(|e| (2, e))?;
             if let Some(path) = opts.output {
                 let target = Path::new(&path);
-                if target.is_symlink() || !target.parent().is_some_and(|p| p.is_dir()) {
+                if target.is_symlink()
+                    || target.parent().is_some_and(|p| !p.as_os_str().is_empty() && !p.is_dir())
+                {
                     return Err((2, "AXO001: symlink or missing output directory".into()));
                 }
                 fs::write(target, payload.as_bytes()).map_err(|e| (2, format!("AXO002: {e}")))?;
