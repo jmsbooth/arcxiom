@@ -115,3 +115,23 @@ fn invalid_source_and_argument_exit_contract() {
     let _ = fs::remove_file(bad);
     let _ = fs::remove_dir(dir);
 }
+
+#[test]
+fn bare_output_filename_in_current_directory_is_safe_and_supported() {
+    let dir = test_dir("cwd-output");
+    let example = published();
+    let result = Command::new(env!("CARGO_BIN_EXE_arcxiom"))
+        .current_dir(&dir)
+        .args(["export", &example, "-o", "model.json"])
+        .output()
+        .expect("Rust CLI must execute");
+    assert_eq!(result.status.code(), Some(0), "{result:?}");
+    let output = dir.join("model.json");
+    assert!(output.is_file());
+    assert_eq!(
+        command(&["verify", output.to_str().unwrap()]).status.code(),
+        Some(0)
+    );
+    let _ = fs::remove_file(output);
+    let _ = fs::remove_dir(dir);
+}
