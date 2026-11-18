@@ -106,12 +106,7 @@ fn security_constraint_is_fail_closed() {
     error(&missing, "AXC004");
     let unused = PUBLISHED.replace("classification: restricted", "classification: public");
     error(&unused, "AXC008");
-    let removed = PUBLISHED
-        .replace(
-            "constraints:\n  - id: security.restricted-transport",
-            "constraints:\n  - id: security.restricted-transport",
-        )
-        .replace("enforcement: hard", "enforcement: advisory");
+    let removed = PUBLISHED.replace("enforcement: hard", "enforcement: advisory");
     let diff = guardrail_delta(&baseline, &valid(&removed));
     assert_eq!(diff[0]["code"], "AXG002");
 }
