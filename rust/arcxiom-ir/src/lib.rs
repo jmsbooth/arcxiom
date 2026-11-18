@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 use std::fmt;
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 
 pub const VERSION: &str = "0.1-draft";
@@ -400,16 +401,26 @@ pub fn compile_file(path: &Path) -> Compiled {
             ));
         }
     }
-    let data = match fs::read(path) {
-        Ok(data) => data,
+    // Never read an untrusted file without a cap: fs::read would allocate the
+    // entire file before our limit check, enabling a memory-exhaustion input.
+    let file = match fs::File::open(path) {
+        Ok(file) => file,
         Err(e) => {
             return fail(Diagnostic::error(
                 "AXY012",
-                format!("cannot read source: {e}"),
+                format!("cannot open source: {e}"),
                 path.display().to_string(),
             ))
         }
     };
+    let mut data = Vec::new();
+    if let Err(e) = file.take((MAX_BYTES + 1) as u64).read_to_end(&mut data) {
+        return fail(Diagnostic::error(
+            "AXY012",
+            format!("cannot read source: {e}"),
+            path.display().to_string(),
+        ));
+    }
     if data.len() > MAX_BYTES {
         return fail(Diagnostic::error(
             "AXY011",
