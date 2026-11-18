@@ -1051,7 +1051,9 @@ pub fn verify_json(bytes: &[u8]) -> Result<String, String> {
     de.end().map_err(|e| format!("AXIR08: {e}"))?;
     let claimed = match ir.get("sha256") {
         None => return Err("AXIR09: missing sha256 digest claim".into()),
-        Some(Value::String(s)) if s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit()) => s.clone(),
+        Some(Value::String(s)) if s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit()) => {
+            s.clone()
+        }
         _ => return Err("AXIR09: sha256 must be a 64-digit hex digest".into()),
     };
     let obj = ir.as_object_mut().ok_or("AXIR04: expected object")?;
