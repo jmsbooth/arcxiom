@@ -344,15 +344,25 @@ fn verifying_a_self_hashed_but_semantically_invalid_ir_fails_closed() {
     let mut ir = valid(PUBLISHED);
     ir["relationships"][0]["relation"] = json!("carries");
     let forged = export(&ir).unwrap();
-    assert!(verify_json(forged.as_bytes()).unwrap_err().contains("AXIR21"));
+    assert!(verify_json(forged.as_bytes())
+        .unwrap_err()
+        .contains("AXIR21"));
     let mut ir = valid(PUBLISHED);
     ir["entities"].as_array_mut().unwrap().reverse();
     let reordered = export(&ir).unwrap();
-    assert!(verify_json(reordered.as_bytes()).unwrap_err().contains("AXIR22"));
+    assert!(verify_json(reordered.as_bytes())
+        .unwrap_err()
+        .contains("AXIR22"));
     let mut ir = valid(PUBLISHED);
-    let flow = ir["entities"].as_array_mut().unwrap().iter_mut()
-        .find(|e| e["type"] == "data_flow").unwrap();
+    let flow = ir["entities"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|e| e["type"] == "data_flow")
+        .unwrap();
     flow["attributes"]["source"] = json!("missing.node");
     let forged = export(&ir).unwrap();
-    assert!(verify_json(forged.as_bytes()).unwrap_err().contains("AXIR21"));
+    assert!(verify_json(forged.as_bytes())
+        .unwrap_err()
+        .contains("AXIR21"));
 }
