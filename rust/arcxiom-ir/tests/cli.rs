@@ -173,8 +173,21 @@ fn unsupported_subcommand_options_fail_without_side_effects() {
         &["validate", &example, "--check-guardrails"],
         &["export", &example, "--id", "role.dispatcher"],
         &["export", &example, "--json"],
-        &["query", &example, "--id", "role.dispatcher", "--check-guardrails"],
-        &["query", &example, "--id", "role.dispatcher", "--output", target],
+        &[
+            "query",
+            &example,
+            "--id",
+            "role.dispatcher",
+            "--check-guardrails",
+        ],
+        &[
+            "query",
+            &example,
+            "--id",
+            "role.dispatcher",
+            "--output",
+            target,
+        ],
         &["diff", &example, &example, "--depth", "2"],
         &["diff", &example, &example, "--output", target],
         &["verify", &example, "--json"],
@@ -182,7 +195,11 @@ fn unsupported_subcommand_options_fail_without_side_effects() {
     ];
     for args in cases {
         let result = command(args);
-        assert_eq!(result.status.code(), Some(64), "accepted unsupported option: {args:?}; {result:?}");
+        assert_eq!(
+            result.status.code(),
+            Some(64),
+            "accepted unsupported option: {args:?}; {result:?}"
+        );
         assert!(result.stdout.is_empty(), "unexpected output for {args:?}");
         assert!(String::from_utf8_lossy(&result.stderr).contains("AXCLI001"));
     }
