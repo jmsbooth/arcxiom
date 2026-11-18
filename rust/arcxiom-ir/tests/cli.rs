@@ -16,7 +16,7 @@ fn published() -> String {
         .to_string()
 }
 fn test_dir(test_name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!(
+    let dir = std::env::temp_dir().canonicalize().expect("resolve system temp root").join(format!(
         "arcxiom-cli-e2e-{}-{test_name}",
         std::process::id()
     ));
