@@ -230,8 +230,17 @@ fn main_run(args: &[String]) -> Result<i32, (i32, String)> {
             if opts.positional.len() != 1 {
                 return Err((64, usage()));
             }
-            let file =
-                fs::File::open(&opts.positional[0]).map_err(|e| (2, format!("AXIR20: {e}")))?;
+            let verify_path = Path::new(&opts.positional[0]);
+            let metadata = fs::symlink_metadata(verify_path)
+                .map_err(|e| (2, format!("AXIR20: {e}")))?;
+            if !metadata.file_type().is_file() {
+                return Err((2, "AXIR20: verification input must be a regular file".into()));
+            }
+            let file = fs::File::open(verify_path)
+                .map_err(|e| (2, format!("AXIR20: {e}")))?;
+            if !file.metadata().is_ok_and(|m| m.is_file()) {
+                return Err((2, "AXIR20: opened verification input is not a regular file".into()));
+            }
             let mut data = Vec::new();
             file.take((4 * MAX_BYTES + 1) as u64)
                 .read_to_end(&mut data)
