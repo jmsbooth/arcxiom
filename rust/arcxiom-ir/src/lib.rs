@@ -502,7 +502,11 @@ pub fn compile_document(root: &Value) -> Compiled {
         ));
     }
     if !obj.contains_key("entities") {
-        ds.push(Diagnostic::error("AXS004", "entities field is required", "entities"));
+        ds.push(Diagnostic::error(
+            "AXS004",
+            "entities field is required",
+            "entities",
+        ));
     }
     let entities = opt_array(obj, "entities", &mut ds, MAX_ENTITIES);
     let relations = opt_array(obj, "relationships", &mut ds, MAX_RELATIONSHIPS);
