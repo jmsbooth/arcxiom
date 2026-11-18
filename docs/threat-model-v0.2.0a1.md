@@ -19,7 +19,7 @@ The .arch.yaml file, its file path, ArchIR JSON supplied to verify, command-line
 | Rule downgrade | Hard constraints with missing evidence fail; offline diff detects hard rule removal/mutation and data classification changes | Supplied baseline is **not authenticated**, runtime controls are **not observed**, and advisory rules are non-blocking |
 | Symlink and path races | Reject symlink input components and symlink output files; no imports/remote reads | Filesystem check-then-open race remains on adversarial multi-user systems; OS handle-based no-follow opening is required before high-trust deployment |
 | Hash confusion / downgrade | Frozen ArchIR version, deterministic ordering, digest excludes only sha256, mismatched digest fails | SHA-256 is not a signature; callers must authenticate provenance out of band |
-| Dependency compromise / malicious CI | Rust lockfile, pinned core CI actions, least-privilege CI, no release on PR pushes, maintainer-only explicit release draft | Full dependency vulnerability, license and transitive audit must be signed off before publication |
+| Dependency compromise / malicious CI | Rust lockfile, maintained safe-Rust serde-saphyr YAML parser, pinned core CI actions, least-privilege CI, no release on PR pushes, maintainer-only explicit release draft | Full dependency vulnerability, license and transitive audit must be signed off before publication |
 | Artifact substitution | Candidate archive and per-file checksums; independent checksum verification in release packaging | Checksum file and artifact must be distributed/authenticated through trusted channel; attested provenance is not yet delivered |
 
 ## Required independent checks
