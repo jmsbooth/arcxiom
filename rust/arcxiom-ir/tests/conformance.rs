@@ -317,3 +317,41 @@ fn symlink_components_are_rejected() {
     let _ = std::fs::remove_file(&dest);
     assert_eq!(result.diagnostics[0].code, "AXY010");
 }
+
+#[test]
+fn public_json_compiler_is_bounded_and_float_rejecting() {
+    let mut source = json!({
+        "version": "0.1-draft",
+        "namespace": "demo",
+        "entities": [{"id": "role.x", "type": "role", "budget": 2.5}]
+    });
+    let c = arcxiom_ir::compile_document(&source);
+    assert!(!c.valid());
+    assert_eq!(c.diagnostics[0].code, "AXS006");
+    let mut nested = json!(true);
+    for _ in 0..30 {
+        nested = json!([nested]);
+    }
+    source["entities"][0]["budget"] = nested;
+    let c = arcxiom_ir::compile_document(&source);
+    assert!(!c.valid());
+    assert_eq!(c.diagnostics[0].code, "AXS006");
+}
+
+#[test]
+fn verifying_a_self_hashed_but_semantically_invalid_ir_fails_closed() {
+    let mut ir = valid(PUBLISHED);
+    ir["relationships"][0]["relation"] = json!("carries");
+    let forged = export(&ir).unwrap();
+    assert!(verify_json(forged.as_bytes()).unwrap_err().contains("AXIR21"));
+    let mut ir = valid(PUBLISHED);
+    ir["entities"].as_array_mut().unwrap().reverse();
+    let reordered = export(&ir).unwrap();
+    assert!(verify_json(reordered.as_bytes()).unwrap_err().contains("AXIR22"));
+    let mut ir = valid(PUBLISHED);
+    let flow = ir["entities"].as_array_mut().unwrap().iter_mut()
+        .find(|e| e["type"] == "data_flow").unwrap();
+    flow["attributes"]["source"] = json!("missing.node");
+    let forged = export(&ir).unwrap();
+    assert!(verify_json(forged.as_bytes()).unwrap_err().contains("AXIR21"));
+}
