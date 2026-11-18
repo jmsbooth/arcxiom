@@ -245,6 +245,91 @@ impl<'de> Deserialize<'de> for Strict {
 // Cheap, bounded lexical rejection before recursive YAML deserialization. Restrict
 // the supported alpha syntax instead of trying to sanitize general YAML after
 // aliases/tags/merge expansion. Quoted strings and comments are not scanned as tokens.
+// Do not silently convert 0x, 0o, or 0b scalar spellings into decimal
+// integers. They are outside the versioned ArchYAML numeric profile.
+fn nondecimal_integer_token(token: &str) -> bool {
+    let plain = if token.starts_with('+') || token.starts_with('-') {
+        &token[1..]
+    } else {
+        token
+    };
+    let lower = plain.to_ascii_lowercase();
+    for (prefix, radix) in [("0x", 16u32), ("0o", 8), ("0b", 2)] {
+        if let Some(digits) = lower.strip_prefix(prefix) {
+            return digits.chars().any(|ch| ch != '_')
+                && digits.chars().all(|ch| ch == '_' || ch.to_digit(radix).is_some());
+        }
+    }
+    false
+}
+fn unquoted_nondecimal_line(src: &str) -> Option<usize> {
+    let mut quote: Option<char> = None;
+    for (line_no, raw) in src.lines().enumerate() {
+        let mut expecting_value = false;
+        let mut token = String::new();
+        let mut previous = ' ';
+        let mut chars = raw.chars().peekable();
+        while let Some(c) = chars.next() {
+            if let Some(q) = quote {
+                if q == '"' && c == '\\' {
+                    chars.next();
+                    continue;
+                }
+                if c == q {
+                    if q == '\'' && chars.peek() == Some(&'\'') {
+                        chars.next();
+                    } else {
+                        quote = None;
+                    }
+                }
+                continue;
+            }
+            if c == '#' && previous.is_whitespace() {
+                break;
+            }
+            if c == '"' || c == '\'' {
+                if expecting_value && nondecimal_integer_token(&token) {
+                    return Some(line_no + 1);
+                }
+                token.clear();
+                quote = Some(c);
+                expecting_value = false;
+            } else if matches!(c, ':' | '[' | '{' | ',') {
+                if expecting_value && nondecimal_integer_token(&token) {
+                    return Some(line_no + 1);
+                }
+                token.clear();
+                expecting_value = true;
+            } else if matches!(c, ']' | '}') {
+                if expecting_value && nondecimal_integer_token(&token) {
+                    return Some(line_no + 1);
+                }
+                token.clear();
+                expecting_value = false;
+            } else if c.is_whitespace() {
+                if !token.is_empty() {
+                    if expecting_value && nondecimal_integer_token(&token) {
+                        return Some(line_no + 1);
+                    }
+                    token.clear();
+                    expecting_value = false;
+                }
+            } else {
+                token.push(c);
+                if token == "-" && chars.peek().is_some_and(|n| n.is_whitespace()) {
+                    token.clear();
+                    expecting_value = true;
+                }
+            }
+            previous = c;
+        }
+        if expecting_value && nondecimal_integer_token(&token) {
+            return Some(line_no + 1);
+        }
+    }
+    None
+}
+
 fn preflight(src: &str) -> Result<(), Diagnostic> {
     if src.len() > MAX_BYTES {
         return Err(Diagnostic::error("AXY011", "input exceeds 1 MiB", "source"));
@@ -254,6 +339,13 @@ fn preflight(src: &str) -> Result<(), Diagnostic> {
             "AXY001",
             "NUL bytes are not allowed",
             "source",
+        ));
+    }
+    if let Some(line) = unquoted_nondecimal_line(src) {
+        return Err(Diagnostic::error(
+            "AXY007",
+            "non-decimal integer spelling is unsupported; quote text values",
+            format!("line:{line}"),
         ));
     }
     let mut indents: Vec<usize> = vec![0];
