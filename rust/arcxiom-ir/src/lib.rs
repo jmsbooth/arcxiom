@@ -1028,7 +1028,10 @@ pub fn query(ir: &Value, start: &str, direction: &str, depth: usize) -> Result<V
     }
     let matches: Vec<_> = seen
         .into_iter()
-        .map(|(id, distance)| json!({"id":id,"type":field(nodes[&id],"type"),"distance":distance}))
+        .map(|(id, distance)| {
+            let node = nodes.get(id.as_str()).expect("query node must exist");
+            json!({"id":id,"type":field(node,"type"),"distance":distance})
+        })
         .collect();
     let relationships: Vec<_> = edges
         .into_iter()
@@ -1076,8 +1079,8 @@ pub fn diff(before: &Value, after: &Value) -> Result<Value, String> {
         let mut removed = 0;
         let mut modified = 0;
         for key in left.keys().chain(right.keys()).collect::<BTreeSet<_>>() {
-            let a = left.get(*key);
-            let b = right.get(*key);
+            let a = left.get(key);
+            let b = right.get(key);
             let action = match (a, b) {
                 (None, Some(_)) => {
                     added += 1;
